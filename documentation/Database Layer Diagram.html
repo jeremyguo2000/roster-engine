@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roster Engine — DB Layer Diagram</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #1a1917; min-height: 100vh; padding: 32px; }
+  svg { display: block; width: 1000px; height: auto; }
+</style>
+</head>
+<body>
+<svg viewBox="0 0 680 610" xmlns="http://www.w3.org/2000/svg">
+
+  <rect width="680" height="610" fill="#1a1917"/>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arr-dash" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#5f5e5a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- LAYER 1: Master data -->
+  <rect x="20" y="20" width="640" height="168" rx="14" fill="#04342c" stroke="#1d9e75" stroke-width="1"/>
+  <text x="38" y="46" font-family="'DM Sans',sans-serif" font-size="15" font-weight="500" fill="#9fe1cb">Master data</text>
+  <text x="38" y="63" font-family="'DM Sans',sans-serif" font-size="12" fill="#5dcaa5">Rarely changes — seeded once, maintained by admin</text>
+
+  <rect x="38" y="78" width="140" height="82" rx="8" fill="#085041" stroke="#1d9e75" stroke-width="0.5"/>
+  <text x="108" y="102" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#9fe1cb">Skills</text>
+  <text x="108" y="120" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#5dcaa5">SkillType</text>
+  <text x="108" y="136" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#5dcaa5">SkillValue</text>
+
+  <rect x="190" y="78" width="140" height="82" rx="8" fill="#085041" stroke="#1d9e75" stroke-width="0.5"/>
+  <text x="260" y="102" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#9fe1cb">Shifts</text>
+  <text x="260" y="120" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#5dcaa5">ShiftGroup</text>
+  <text x="260" y="136" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#5dcaa5">Shift</text>
+
+  <rect x="342" y="78" width="300" height="82" rx="8" fill="#085041" stroke="#1d9e75" stroke-width="0.5"/>
+  <text x="492" y="102" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#9fe1cb">Staff</text>
+  <text x="492" y="120" text-anchor="middle" font-family="'DM Mono',monospace" font-size="10.5" fill="#5dcaa5">StaffGroup · Staff (deleted) · StaffSkill</text>
+  <text x="492" y="136" text-anchor="middle" font-family="'DM Mono',monospace" font-size="10.5" fill="#5dcaa5">StaffPermittedShift · Leave (whole year)</text>
+
+  <!-- Arrows: master → config -->
+  <line x1="108" y1="188" x2="252" y2="286" stroke="#888780" stroke-width="1.1" fill="none" marker-end="url(#arr)"/>
+  <line x1="260" y1="188" x2="296" y2="286" stroke="#888780" stroke-width="1.1" fill="none" marker-end="url(#arr)"/>
+  <line x1="448" y1="188" x2="392" y2="286" stroke="#888780" stroke-width="1.1" fill="none" marker-end="url(#arr)"/>
+
+  <!-- LAYER 2: Configuration -->
+  <rect x="20" y="228" width="640" height="132" rx="14" fill="#26215c" stroke="#7f77dd" stroke-width="1"/>
+  <text x="38" y="254" font-family="'DM Sans',sans-serif" font-size="15" font-weight="500" fill="#cecbf6">Configuration</text>
+  <text x="38" y="271" font-family="'DM Sans',sans-serif" font-size="12" fill="#afa9ec">Reusable solver settings — selected at generate time, shared across many roster runs</text>
+
+  <rect x="88" y="284" width="504" height="58" rx="8" fill="#3c3489" stroke="#7f77dd" stroke-width="0.5"/>
+  <text x="340" y="308" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#cecbf6">Profile</text>
+  <text x="340" y="326" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#afa9ec">weights · constraints · time_limit · ProfileStaff (excluded) · ProfileShift</text>
+
+  <!-- Arrows: config → execution -->
+  <line x1="276" y1="360" x2="188" y2="438" stroke="#888780" stroke-width="1.1" fill="none" marker-end="url(#arr)"/>
+  <line x1="340" y1="360" x2="363" y2="438" stroke="#888780" stroke-width="1.1" fill="none" marker-end="url(#arr)"/>
+
+  <!-- LAYER 3: Roster execution -->
+  <rect x="20" y="400" width="640" height="208" rx="14" fill="#4a1b0c" stroke="#d85a30" stroke-width="1"/>
+  <text x="38" y="426" font-family="'DM Sans',sans-serif" font-size="15" font-weight="500" fill="#f5c4b3">Roster execution</text>
+  <text x="38" y="443" font-family="'DM Sans',sans-serif" font-size="12" fill="#f0997b">Created per solver run — stays as draft until approved; approved rosters chain automatically</text>
+
+  <rect x="38" y="456" width="200" height="100" rx="8" fill="#711b13" stroke="#d85a30" stroke-width="0.5"/>
+  <text x="138" y="480" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#f5c4b3">Roster</text>
+  <text x="138" y="497" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">name · status · dates</text>
+  <text x="138" y="513" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">result (JSON)</text>
+  <text x="138" y="529" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">profile_id FK</text>
+
+  <rect x="258" y="456" width="200" height="100" rx="8" fill="#711b13" stroke="#d85a30" stroke-width="0.5"/>
+  <text x="358" y="480" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#f5c4b3">Demand</text>
+  <text x="358" y="497" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">date · start/end · headcount</text>
+  <text x="358" y="513" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">skill_value_id FK (nullable)</text>
+  <text x="358" y="529" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">roster_id FK</text>
+
+  <rect x="478" y="456" width="162" height="100" rx="8" fill="#711b13" stroke="#d85a30" stroke-width="0.5" stroke-dasharray="5 3"/>
+  <text x="559" y="480" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#f5c4b3">Job status</text>
+  <text x="559" y="500" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">in-memory only</text>
+  <text x="559" y="516" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">not persisted</text>
+  <text x="559" y="532" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">transient</text>
+
+  <!-- Roster → Demand -->
+  <line x1="238" y1="508" x2="258" y2="508" stroke="#f0997b" stroke-width="1.1" fill="none" marker-end="url(#arr)"/>
+
+  <!-- SkillValue → Demand cross-layer dashed -->
+  <path d="M108 556 L108 578 L358 578 L358 556" fill="none" stroke="#f0997b" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#arr-dash)"/>
+  <text x="233" y="594" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="11" fill="#f0997b">skill filter flows through to demand</text>
+
+</svg>
+</body>
+</html>

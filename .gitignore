@@ -1,10 +1,35 @@
-.env
+# Python / Conda
+.venv/
 __pycache__/
 *.pyc
 *.pyo
-.venv/
-node_modules/
-dist/
-.DS_Store
+*.pyd
+.Python
 *.egg-info/
-.pytest_cache/
+dist/
+build/
+
+# Alembic
+alembic/versions/*.pyc
+
+# Environment
+.env
+*.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+postgres_data/
+
+# Frontend (for later)
+node_modules/
+frontend/dist/
+frontend/.env.local

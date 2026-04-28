@@ -27,7 +27,16 @@ docker compose -f docker-compose.dev.yml up --build
 
 In a second terminal, once containers are up:
 
+alembic revision --autogenerate
+└── inspects SQLAlchemy models → generates migration file
+    (file appears in backend/alembic/versions/ on your host)
+
+alembic upgrade head
+└── runs migration file against postgres
+    └── creates all 14 tables + alembic_version tracking table
+
 ```bash
+docker compose -f docker-compose.dev.yml exec backend alembic revision --autogenerate -m "initial schema"
 docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
 ```
 

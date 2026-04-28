@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roster Engine — Solution Architecture</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:        #0f1117;
+    --paper:      #f5f2eb;
+    --accent:     #c84b31;
+    --accent2:    #2b6cb0;
+    --muted:      #6b7280;
+    --rule:       #d4cfc4;
+    --card:       #ffffff;
+    --tag-dsg:    #2b6cb0;
+    --tag-esg:    #6b46c1;
+    --tag-nsg:    #c84b31;
+    --tag-off:    #2d6a4f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.7;
+  }
+
+  /* ── cover ── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 80px 10vw;
+    position: relative;
+    overflow: hidden;
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .cover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 1px, transparent 1px 60px),
+      repeating-linear-gradient(0deg,  rgba(255,255,255,.03) 0 1px, transparent 1px 60px);
+  }
+
+  .cover-label {
+    font-family: 'DM Mono', monospace;
+    font-size: .75rem;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 2rem;
+    opacity: 0;
+    animation: fadeUp .6s .1s forwards;
+  }
+
+  .cover h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(3rem, 7vw, 6rem);
+    line-height: 1.05;
+    max-width: 14ch;
+    opacity: 0;
+    animation: fadeUp .7s .25s forwards;
+  }
+
+  .cover h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .cover-meta {
+    margin-top: 3rem;
+    display: flex;
+    gap: 3rem;
+    opacity: 0;
+    animation: fadeUp .6s .45s forwards;
+  }
+
+  .cover-meta-item label {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: .7rem;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: .25rem;
+  }
+
+  .cover-meta-item span {
+    font-size: .95rem;
+    color: var(--paper);
+  }
+
+  .cover-scroll {
+    position: absolute;
+    bottom: 2.5rem;
+    left: 10vw;
+    font-family: 'DM Mono', monospace;
+    font-size: .7rem;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    opacity: 0;
+    animation: fadeUp .6s .7s forwards;
+  }
+
+  /* ── layout ── */
+  .toc-rail {
+    position: fixed;
+    top: 50%;
+    right: 2rem;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    z-index: 100;
+  }
+
+  .toc-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--rule);
+    cursor: pointer;
+    transition: background .2s, transform .2s;
+    position: relative;
+  }
+
+  .toc-dot:hover, .toc-dot.active {
+    background: var(--accent);
+    transform: scale(1.4);
+  }
+
+  .toc-dot::before {
+    content: attr(data-label);
+    position: absolute;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    font-family: 'DM Mono', monospace;
+    font-size: .65rem;
+    letter-spacing: .1em;
+    color: var(--ink);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+  }
+
+  .toc-dot:hover::before { opacity: 1; }
+
+  .main { max-width: 960px; margin: 0 auto; padding: 80px 2rem; }
+
+  /* ── section ── */
+  .section {
+    margin-bottom: 100px;
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity .6s, transform .6s;
+  }
+
+  .section.visible { opacity: 1; transform: none; }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .section-num {
+    font-family: 'DM Mono', monospace;
+    font-size: .75rem;
+    color: var(--accent);
+    letter-spacing: .1em;
+  }
+
+  .section-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.9rem;
+    color: var(--ink);
+  }
+
+  .section-desc {
+    color: var(--muted);
+    font-size: .95rem;
+    max-width: 68ch;
+    margin-bottom: 2.5rem;
+    line-height: 1.75;
+  }
+
+  /* ── diagram card ── */
+  .diagram-card {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 2.5rem 2rem;
+    overflow-x: auto;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  }
+
+  .diagram-card .mermaid {
+    display: flex;
+    justify-content: center;
+  }
+
+  /* ── legend ── */
+  .legend {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-family: 'DM Mono', monospace;
+    font-size: .72rem;
+    letter-spacing: .05em;
+    color: var(--muted);
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+  }
+
+  /* ── constraint table ── */
+  .constraint-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .constraint-card {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.25rem 1.5rem;
+    border-left: 3px solid var(--accent2);
+  }
+
+  .constraint-card.hard { border-left-color: var(--accent); }
+  .constraint-card.objective { border-left-color: var(--tag-off); }
+
+  .constraint-id {
+    font-family: 'DM Mono', monospace;
+    font-size: .72rem;
+    letter-spacing: .1em;
+    color: var(--accent);
+    margin-bottom: .4rem;
+  }
+
+  .constraint-name {
+    font-weight: 500;
+    font-size: .9rem;
+    margin-bottom: .35rem;
+  }
+
+  .constraint-desc {
+    font-size: .82rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── rule pill ── */
+  .rule-example {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    background: var(--ink);
+    color: var(--paper);
+    padding: .3rem .75rem;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: .72rem;
+    margin: .25rem .25rem 0 0;
+  }
+
+  .rule-example .arrow { color: var(--accent); }
+
+  /* ── timeline ── */
+  .timeline-wrap {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 2rem;
+    overflow-x: auto;
+  }
+
+  .timeline-label {
+    font-family: 'DM Mono', monospace;
+    font-size: .7rem;
+    letter-spacing: .1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+  }
+
+  .timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: .75rem;
+  }
+
+  .timeline-name {
+    font-size: .82rem;
+    width: 110px;
+    flex-shrink: 0;
+    color: var(--muted);
+  }
+
+  .timeline-track {
+    display: flex;
+    gap: 3px;
+    flex: 1;
+  }
+
+  .day-cell {
+    width: 38px;
+    height: 32px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: .6rem;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .day-nsg    { background: var(--tag-nsg); }
+  .day-dsg    { background: var(--tag-dsg); }
+  .day-esg    { background: var(--tag-esg); }
+  .day-rest   { background: var(--rule); color: var(--muted); }
+  .day-block  { background: #fde8e4; color: var(--accent); border: 1px solid var(--accent); }
+  .day-future { background: #f0f4ff; color: var(--accent2); border: 1px dashed var(--accent2); }
+  .day-empty  { background: transparent; border: 1px solid var(--rule); color: var(--rule); }
+  .day-boundary { position: relative; }
+  .day-boundary::after {
+    content: '';
+    position: absolute;
+    left: -5px; top: -4px; bottom: -4px;
+    width: 2px;
+    background: var(--accent);
+  }
+
+  .day-labels {
+    display: flex;
+    gap: 3px;
+    margin-left: 110px;
+    margin-bottom: .35rem;
+  }
+
+  .day-label-cell {
+    width: 38px;
+    font-family: 'DM Mono', monospace;
+    font-size: .58rem;
+    color: var(--muted);
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .roster-label {
+    font-family: 'DM Mono', monospace;
+    font-size: .62rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: .4rem;
+    margin-left: 110px;
+  }
+
+  /* ── anim ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* ── responsive ── */
+  @media (max-width: 640px) {
+    .toc-rail { display: none; }
+    .cover { padding: 60px 6vw; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ COVER ══════════════════════════════════════════════════════════ -->
+<section class="cover" id="s0">
+  <div class="cover-label">Solution Architecture</div>
+  <h1>Roster<br><em>Engine</em></h1>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <label>Stack</label>
+      <span>Python · OR-Tools CP-SAT</span>
+    </div>
+    <div class="cover-meta-item">
+      <label>Scope</label>
+      <span>Chained Roster Generation</span>
+    </div>
+
+  </div>
+  <div class="cover-scroll">Scroll to explore ↓</div>
+</section>
+
+<!-- ══ TOC RAIL ════════════════════════════════════════════════════════ -->
+<nav class="toc-rail" id="toc">
+  <div class="toc-dot" data-target="s1" data-label="System Overview"></div>
+  <div class="toc-dot" data-target="s2" data-label="Domain Model"></div>
+  <div class="toc-dot" data-target="s3" data-label="Constraint Pipeline"></div>
+  <div class="toc-dot" data-target="s4" data-label="ConditionalConstraint"></div>
+  <div class="toc-dot" data-target="s5" data-label="Chained Rosters"></div>
+  <div class="toc-dot" data-target="s6" data-label="Boundary Carry-Over"></div>
+</nav>
+
+<div class="main">
+
+  <!-- ══ 1. SYSTEM OVERVIEW ══════════════════════════════════════════ -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2 class="section-title">System Overview</h2>
+    </div>
+    <p class="section-desc">
+      Three layers work together: <strong>app.py</strong> defines the problem (shifts, staff, demands, rules),
+      <strong>solver.py</strong> translates it into a CP-SAT model and solves it,
+      and <strong>models.py</strong> provides the shared domain vocabulary.
+      The solver returns an <code>assignments</code> dict mapping (staff, day, shift) → 0 or 1, which can be chained across roster periods via <code>RosterContext</code>.
+    </p>
+    <div class="diagram-card">
+      <div class="mermaid">
+graph TB
+    subgraph CONFIG["app.py — Configuration Layer"]
+        direction LR
+        A1[ShiftGroup & Shift<br/>definitions] ~~~ A2[Staff &amp; Skill<br/>definitions] ~~~ A3[Demand<br/>windows] ~~~ A4[ConditionalConstraint<br/>rules] ~~~ A5[Leave<br/>pre-assignments]
+    end
+
+    subgraph ENGINE["solver.py — Engine Layer"]
+        direction TB
+        B1[RosterEngine]
+        B2[generate_roster]
+        B3[CP-SAT Model]
+        B4[build_roster_context]
+        B5[RosterContext]
+        B1 --> B2
+        B2 --> B3
+        B2 --> B4
+        B4 --> B5
+    end
+
+    subgraph OUTPUT["Output"]
+        C1["assignments dict<br/>(n, d, s) → 0 or 1<br/>consec_days, status,<br/>roster_start, num_days"]
+    end
+
+    CONFIG --> ENGINE
+    B3 --> C1
+    B5 -.->|"next roster"| B2
+
+    style CONFIG fill:#f0f4ff,stroke:#2b6cb0,stroke-width:1px
+    style ENGINE fill:#fff5f5,stroke:#c84b31,stroke-width:1px
+    style OUTPUT fill:#f0fff4,stroke:#2d6a4f,stroke-width:1px
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 2. DOMAIN MODEL ═════════════════════════════════════════════ -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <h2 class="section-title">Domain Model</h2>
+    </div>
+    <p class="section-desc">
+      All domain objects live in <code>models.py</code>. <code>ShiftGroup</code> categorises shifts by behaviour flags.
+      <code>Shift</code> is a template assigned to staff on any day. <code>Staff</code> carries a skill set and a list of permitted shifts.
+      <code>Demand</code> specifies the minimum headcount required during a time window on a given date.
+    </p>
+    <div class="diagram-card">
+      <div class="mermaid">
+graph TD
+    SG["<b>ShiftGroup</b><br/>──────────────<br/>+ code : str<br/>+ is_night_shift : bool<br/>+ is_work_shift : bool<br/>+ is_applied_leave : bool"]
+
+    SH["<b>Shift</b><br/>──────────────<br/>+ code : str<br/>+ name : str<br/>+ shift_group : ShiftGroup<br/>+ start_time : int<br/>+ end_time : int<br/>+ work_time : int<br/>+ break_time : int"]
+
+    ST["<b>Staff</b><br/>──────────────<br/>+ fullname : str<br/>+ skillset : list[Skill]<br/>+ permitted_shifts : list[Shift]<br/>+ meets_requirements() : bool"]
+
+    SK["<b>Skill</b><br/>──────────────<br/>+ key : str<br/>+ value : str"]
+
+    DM["<b>Demand</b><br/>──────────────<br/>+ date : date<br/>+ start_time : int<br/>+ end_time : int<br/>+ headcount : int<br/>+ skillset_required : list[Skill]"]
+
+    RC["<b>RosterContext</b><br/>──────────────<br/>+ carry_consec : dict<br/>+ carry_shifts : dict"]
+
+    CC["<b>ConditionalConstraint</b><br/>──────────────<br/>+ trigger : str<br/>+ trigger_val : int<br/>+ offset : int<br/>+ enforce : str<br/>+ enforce_val : int"]
+
+    RE["<b>RosterEngine</b><br/>──────────────<br/>+ shifts : list[Shift]<br/>+ staff_list : list[Staff]<br/>+ num_days : int<br/>+ target_hours : float<br/>+ conditional_constraints : list<br/>+ generate_roster() : dict<br/>+ build_roster_context() : RosterContext<br/>+ build_pre_assignments_for_leaves() : list"]
+
+    SG -->|"1 ──◇ many"| SH
+    SH -->|"many ──◇ many"| ST
+    ST -->|"has"| SK
+    SK -->|"required by"| DM
+    RE --> ST
+    RE --> SH
+    RE --> DM
+    RE --> CC
+    RE -.->|"produces"| RC
+
+    style SG fill:#f0f4ff,stroke:#2b6cb0,stroke-width:1px,color:#0f1117
+    style SH fill:#f0f4ff,stroke:#2b6cb0,stroke-width:1px,color:#0f1117
+    style ST fill:#f0f4ff,stroke:#2b6cb0,stroke-width:1px,color:#0f1117
+    style SK fill:#fffbeb,stroke:#b7791f,stroke-width:1px,color:#0f1117
+    style DM fill:#f0f4ff,stroke:#2b6cb0,stroke-width:1px,color:#0f1117
+    style RC fill:#fff5f5,stroke:#c84b31,stroke-width:1px,color:#0f1117
+    style CC fill:#fff5f5,stroke:#c84b31,stroke-width:1px,color:#0f1117
+    style RE fill:#f0fff4,stroke:#2d6a4f,stroke-width:2px,color:#0f1117
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 3. CONSTRAINT PIPELINE ══════════════════════════════════════ -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <h2 class="section-title">Constraint Pipeline</h2>
+    </div>
+    <p class="section-desc">
+      Constraints are applied in order inside <code>generate_roster()</code> before the solver runs.
+      Hard constraints define feasibility; the objective drives fairness.
+    </p>
+    <div class="diagram-card">
+      <div class="mermaid">
+flowchart TD
+    START([generate_roster called]) --> C1
+
+    C1["C1 — One shift per day\nAt most 1 work shift and\n1 rest shift per staff per day"]
+    C4["C4 — Target hours\nExactly target_minutes of work\nper staff over the roster"]
+    C5["C5 — Demand coverage\nAt each checkpoint time,\nheadcount ≥ demand.headcount\nfor eligible staff"]
+    C6["C6 — Permitted shifts\nBlock shifts not in\nstaff.permitted_shifts"]
+    C7["C7 — Pre-assignments\nBlock unassigned rest shifts to 0,\nPin pre-assigned shifts to 1,\nblock other work shifts on that day"]
+    C8["C8 — No demand, no work\nBlock all work shifts on days\nwith no demand"]
+    C9["C9 — ConditionalConstraints\nFor each rule: if trigger\nshiftgroup == trigger_val on day d\nthen enforce shiftgroup ==\nenforce_val on day d+offset"]
+    C10["C10 — Boundary carry-over\nApply ConditionalConstraints\nacross roster boundary using\nRosterContext.carry_shifts"]
+    OBJ["Objective — Weighted minimisation\nmin: max consecutive days × 100\n+ overstaffing spread × 20\n+ night/weekend burden × 10"]
+    SOLVE([CP-SAT Solve])
+
+    C1 --> C4 --> C5 --> C6 --> C7 --> C8 --> C9 --> C10 --> OBJ --> SOLVE
+
+    style C1  fill:#f0f4ff,stroke:#2b6cb0
+    style C4  fill:#f0f4ff,stroke:#2b6cb0
+    style C5  fill:#f0f4ff,stroke:#2b6cb0
+    style C6  fill:#f0f4ff,stroke:#2b6cb0
+    style C7  fill:#f0f4ff,stroke:#2b6cb0
+    style C8  fill:#f0f4ff,stroke:#2b6cb0
+    style C9  fill:#fff5f5,stroke:#c84b31
+    style C10 fill:#fff5f5,stroke:#c84b31
+    style OBJ fill:#f0fff4,stroke:#2d6a4f
+      </div>
+    </div>
+
+    <div class="constraint-grid" style="margin-top:2rem">
+      <div class="constraint-card hard">
+        <div class="constraint-id">C1</div>
+        <div class="constraint-name">One Shift Per Day</div>
+        <div class="constraint-desc">At most one work shift and one rest shift assigned per staff per day. Prevents double-booking.</div>
+      </div>
+      <div class="constraint-card hard">
+        <div class="constraint-id">C4</div>
+        <div class="constraint-name">Exact Target Hours</div>
+        <div class="constraint-desc">Each staff member's total work_time across all days must equal exactly target_minutes (e.g. 4800 min = 80 hrs).</div>
+      </div>
+      <div class="constraint-card hard">
+        <div class="constraint-id">C5</div>
+        <div class="constraint-name">Demand Coverage</div>
+        <div class="constraint-desc">At each demand checkpoint, the count of eligible staff (skill-filtered) covering that time must meet headcount.</div>
+      </div>
+      <div class="constraint-card">
+        <div class="constraint-id">C6</div>
+        <div class="constraint-name">Permitted Shifts</div>
+        <div class="constraint-desc">Staff can only be assigned shifts in their permitted_shifts list. Used to restrict night shifts for specific staff.</div>
+      </div>
+      <div class="constraint-card">
+        <div class="constraint-id">C7</div>
+        <div class="constraint-name">Pre-Assignments (Leave)</div>
+        <div class="constraint-desc">Unassigned rest shifts are blocked to 0. Pre-assigned shifts are pinned to 1, and all other work shifts on that day are blocked to 0.</div>
+      </div>
+      <div class="constraint-card">
+        <div class="constraint-id">C8</div>
+        <div class="constraint-name">No Demand, No Work</div>
+        <div class="constraint-desc">Work shifts are blocked on days with no demand, preventing the solver from assigning staff unnecessarily on days with no demand.</div>
+      </div>
+      <div class="constraint-card hard" style="border-left-color:var(--accent)">
+        <div class="constraint-id">C9</div>
+        <div class="constraint-name">ConditionalConstraints</div>
+        <div class="constraint-desc">Dynamic if/then rules configurable from outside the solver. Replaces all hardcoded post-shift rest logic.</div>
+      </div>
+      <div class="constraint-card hard" style="border-left-color:var(--accent)">
+        <div class="constraint-id">C10</div>
+        <div class="constraint-name">Boundary Carry-Over</div>
+        <div class="constraint-desc">Applies ConditionalConstraints across the roster boundary using RosterContext.carry_shifts as hard constraints (trigger already occurred).</div>
+      </div>
+      <div class="constraint-card objective">
+        <div class="constraint-id">OBJ</div>
+        <div class="constraint-name">Weighted Objective</div>
+        <div class="constraint-desc">Minimise: max consecutive days × 100 + overstaffing spread × 20 + night/weekend burden × 10.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 4. CONDITIONAL CONSTRAINT ═══════════════════════════════════ -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <span class="section-num">04</span>
+      <h2 class="section-title">ConditionalConstraint</h2>
+    </div>
+    <p class="section-desc">
+      A <code>ConditionalConstraint</code> encodes an if/then rule as five parameters.
+      Rules are passed into <code>RosterEngine</code> at construction time and applied to every
+      staff member across every day. Passing an empty list disables all rules entirely.
+    </p>
+    <div class="diagram-card">
+      <div class="mermaid">
+flowchart LR
+    subgraph RULE["ConditionalConstraint(trigger, trigger_val, offset, enforce, enforce_val)"]
+        direction LR
+        T["trigger\nShiftGroup code\ne.g. 'NSG'\nor '*' = all"]
+        TV["trigger_val\n1 = shift assigned\n0 = not assigned"]
+        O["offset\nday delta\n-1, 0, +1, +2 …"]
+        E["enforce\nShiftGroup code\ne.g. 'DSG'\nor '*' = all"]
+        EV["enforce_val\n0 = block\n1 = force"]
+        T --> TV --> O --> E --> EV
+    end
+
+    subgraph LOGIC["Solver logic for each staff n, day d"]
+        direction TB
+        L1{"trigger == trigger_val\non day d?"}
+        L2["Set enforce == enforce_val\non day d + offset"]
+        L1 -->|Yes| L2
+        L1 -->|No| L3[No effect]
+    end
+
+    RULE --> LOGIC
+
+    style RULE fill:#fff5f5,stroke:#c84b31,stroke-width:1px
+    style LOGIC fill:#f5f2eb,stroke:#6b7280,stroke-width:1px
+      </div>
+    </div>
+
+    <div style="margin-top:2rem">
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem;font-family:'DM Mono',monospace;letter-spacing:.05em;text-transform:uppercase;font-size:.7rem">
+        Active rules in app.py
+      </p>
+      <div>
+        <span class="rule-example">
+          trigger="NSG" trigger_val=1 offset=+1
+          <span class="arrow">→</span>
+          enforce="*" enforce_val=0
+          <span style="color:var(--muted);margin-left:.5rem">// block all work the day after a night shift</span>
+        </span>
+      </div>
+      <div>
+        <span class="rule-example">
+          trigger="NSG" trigger_val=1 offset=+2
+          <span class="arrow">→</span>
+          enforce="DSG" enforce_val=0
+          <span style="color:var(--muted);margin-left:.5rem">// block DSG 2 days after a night shift</span>
+        </span>
+      </div>
+      <div>
+        <span class="rule-example">
+          trigger="Leaves" trigger_val=1 offset=-1
+          <span class="arrow">→</span>
+          enforce="NSG" enforce_val=0
+          <span style="color:var(--muted);margin-left:.5rem">// block night shift the day before leave</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 5. CHAINED ROSTERS ══════════════════════════════════════════ -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <h2 class="section-title">Chained Roster Flow</h2>
+    </div>
+    <p class="section-desc">
+      Two consecutive rosters are generated sequentially. <code>build_roster_context()</code> extracts the carry-over state from a completed roster
+      which seeds the next roster's boundary constraints via C10.
+    </p>
+    <div class="diagram-card">
+      <div class="mermaid">
+sequenceDiagram
+    participant T as app.py
+    participant E as RosterEngine
+    participant CP as CP-SAT Solver
+    participant RC as RosterContext
+
+    Note over T: ROSTER 1
+    T->>E: generate_roster(roster_start, demands, leaves)
+    E->>CP: Build model with C1,C4,C5,C6,C7,C8,C9
+    CP-->>E: result_1 {assignments, consec_days, …}
+    E-->>T: result_1
+
+    T->>T: print_roster(result_1)
+    T->>T: print_staff_summary(result_1)
+
+    Note over T: EXTRACT CARRY-OVER STATE
+    T->>E: build_roster_context(result_1, next_roster_start)
+    E->>E: Scan backwards from last day per staff
+    E->>E: Record last shift group + days_ago
+    E->>E: Record consecutive day count
+    E-->>T: RosterContext {carry_consec, carry_shifts}
+
+    Note over T: ROSTER 2
+    T->>E: generate_roster(roster_start, demands, leaves, context)
+    E->>CP: Build model + C10 boundary constraints
+    CP-->>E: result_2 {assignments, consec_days, …}
+    E-->>T: result_2
+
+    T->>T: print_roster(result_2)
+    T->>T: print_staff_summary(result_2)
+
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 6. BOUNDARY CARRY-OVER ══════════════════════════════════════ -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <span class="section-num">06</span>
+      <h2 class="section-title">Boundary Carry-Over</h2>
+    </div>
+    <p class="section-desc">
+      <code>RosterContext.carry_shifts</code> stores the most recent shift group and how many days ago it was
+      assigned (relative to the next roster's start). <code>C10</code> then matches this against
+      all active <code>ConditionalConstraint</code> rules and applies them as hard constraints
+      on the first days of the new roster — no <code>OnlyEnforceIf</code> needed since the trigger
+      already occurred.
+    </p>
+
+    <div class="timeline-wrap">
+      <div class="timeline-label">Example — Staff worked NSG on last day of Roster 1</div>
+
+      <div class="day-labels">
+        <div class="day-label-cell">d10</div>
+        <div class="day-label-cell">d11</div>
+        <div class="day-label-cell">d12</div>
+        <div class="day-label-cell" style="color:var(--accent)">d13</div>
+        <div class="day-label-cell" style="color:var(--accent);font-weight:700">│</div>
+        <div class="day-label-cell">d0</div>
+        <div class="day-label-cell">d1</div>
+        <div class="day-label-cell">d2</div>
+        <div class="day-label-cell">d3</div>
+      </div>
+
+      <div class="roster-label" style="margin-left:0;margin-bottom:.5rem">
+        ◀──────── Roster 1 ────────▶ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ◀──── Roster 2 ────
+      </div>
+
+      <div class="timeline-row">
+        <div class="timeline-name">Carol Ng</div>
+        <div class="timeline-track">
+          <div class="day-cell day-esg">ESG</div>
+          <div class="day-cell day-rest">REST</div>
+          <div class="day-cell day-esg">ESG</div>
+          <div class="day-cell day-nsg">NSG</div>
+          <div class="day-cell day-boundary" style="width:16px;background:transparent"></div>
+          <div class="day-cell day-block">BLKD</div>
+          <div class="day-cell day-block">BLKD<br>DSG</div>
+          <div class="day-cell day-future">FREE</div>
+          <div class="day-cell day-future">FREE</div>
+        </div>
+      </div>
+
+      <div class="timeline-row" style="margin-top:1.5rem">
+        <div class="timeline-name" style="font-family:'DM Mono',monospace;font-size:.68rem;color:var(--accent)">carry_shifts</div>
+        <div class="timeline-track" style="align-items:center">
+          <div style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--muted);padding:.25rem .5rem;background:var(--paper);border:1px solid var(--rule);border-radius:2px">
+            "Carol Ng" → ("NSG", -1)
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-row" style="margin-top:.75rem">
+        <div class="timeline-name" style="font-family:'DM Mono',monospace;font-size:.68rem;color:var(--accent)">rules fired</div>
+        <div class="timeline-track" style="align-items:center;flex-wrap:wrap;gap:.4rem">
+          <span class="rule-example" style="font-size:.65rem">NSG(-1) + offset(+1) = d0 → block "*"</span>
+          <span class="rule-example" style="font-size:.65rem">NSG(-1) + offset(+2) = d1 → block "DSG"</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="timeline-wrap" style="margin-top:1.5rem">
+      <div class="timeline-label">Example — Staff worked NSG on second-to-last day of Roster 1</div>
+
+      <div class="day-labels">
+        <div class="day-label-cell">d10</div>
+        <div class="day-label-cell">d11</div>
+        <div class="day-label-cell" style="color:var(--accent)">d12</div>
+        <div class="day-label-cell">d13</div>
+        <div class="day-label-cell" style="color:var(--accent);font-weight:700">│</div>
+        <div class="day-label-cell">d0</div>
+        <div class="day-label-cell">d1</div>
+        <div class="day-label-cell">d2</div>
+        <div class="day-label-cell">d3</div>
+      </div>
+
+      <div class="roster-label" style="margin-left:0;margin-bottom:.5rem">
+        ◀──────── Roster 1 ────────▶ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ◀──── Roster 2 ────
+      </div>
+
+      <div class="timeline-row">
+        <div class="timeline-name">David Koh</div>
+        <div class="timeline-track">
+          <div class="day-cell day-dsg">DSG</div>
+          <div class="day-cell day-rest">REST</div>
+          <div class="day-cell day-nsg">NSG</div>
+          <div class="day-cell day-rest">REST</div>
+          <div class="day-cell day-boundary" style="width:16px;background:transparent"></div>
+          <div class="day-cell day-block">BLKD<br>DSG</div>
+          <div class="day-cell day-future">FREE</div>
+          <div class="day-cell day-future">FREE</div>
+          <div class="day-cell day-future">FREE</div>
+        </div>
+      </div>
+
+      <div class="timeline-row" style="margin-top:1.5rem">
+        <div class="timeline-name" style="font-family:'DM Mono',monospace;font-size:.68rem;color:var(--accent)">carry_shifts</div>
+        <div class="timeline-track" style="align-items:center">
+          <div style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--muted);padding:.25rem .5rem;background:var(--paper);border:1px solid var(--rule);border-radius:2px">
+            "David Koh" → ("NSG", -2)
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-row" style="margin-top:.75rem">
+        <div class="timeline-name" style="font-family:'DM Mono',monospace;font-size:.68rem;color:var(--accent)">rules fired</div>
+        <div class="timeline-track" style="align-items:center;flex-wrap:wrap;gap:.4rem">
+          <span class="rule-example" style="font-size:.65rem">NSG(-2) + offset(+2) = d0 → block "DSG"</span>
+          <span class="rule-example" style="font-size:.65rem">NSG(-2) + offset(+1) = d-1 → out of range, skipped</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend" style="margin-top:1.5rem">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--tag-nsg)"></div>Night Shift (NSG)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--tag-dsg)"></div>Day Shift (DSG)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--tag-esg)"></div>Evening Shift (ESG)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--rule)"></div>Rest Day</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fde8e4;border:1px solid var(--accent)"></div>Blocked by C10</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f0f4ff;border:1px solid var(--accent2)"></div>Free to assign</div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+  // Mermaid init
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'neutral',
+    themeVariables: {
+      primaryColor:       '#f0f4ff',
+      primaryBorderColor: '#2b6cb0',
+      primaryTextColor:   '#0f1117',
+      lineColor:          '#6b7280',
+      secondaryColor:     '#fff5f5',
+      tertiaryColor:      '#f0fff4',
+      fontFamily:         'DM Mono, monospace',
+      fontSize:           '13px',
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence:  { mirrorActors: false, messageAlign: 'left' },
+  });
+
+  // Intersection observer for section reveal
+  const sections = document.querySelectorAll('.section');
+  const dots = document.querySelectorAll('.toc-dot');
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        const id = entry.target.id;
+        dots.forEach(d => {
+          d.classList.toggle('active', d.dataset.target === id);
+        });
+      }
+    });
+  }, { threshold: 0.15 });
+
+  sections.forEach(s => io.observe(s));
+
+  // TOC click nav
+  dots.forEach(dot => {
+    dot.addEventListener('click', () => {
+      document.getElementById(dot.dataset.target)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+</body>
+</html>

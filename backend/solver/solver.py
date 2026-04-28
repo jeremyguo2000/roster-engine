@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from ortools.sat.python import cp_model
-from models import Demand, Shift, Staff
+from solver.models import Demand, Shift, Staff
 
 
 # ---------------------------------------------------------------------------

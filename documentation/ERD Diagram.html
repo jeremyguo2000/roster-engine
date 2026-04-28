@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roster Engine — ERD</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #ffffff;
+    min-height: 100vh;
+    padding: 40px 32px;
+    color: #1a1917;
+    font-family: 'DM Sans', sans-serif;
+  }
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    font-weight: 400;
+    margin-bottom: 6px;
+    color: #1a1917;
+  }
+  p {
+    font-size: 13px;
+    color: #444441;
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+  #erd svg { width: 100%; }
+  #erd svg .er.relationshipLabel { font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1>Roster Engine — Entity Relationship Diagram</h1>
+<p>All 15 tables and their relationships.</p>
+
+<div id="erd" style="padding: 1rem 0"></div>
+
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+
+await document.fonts.ready;
+
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace",
+  themeVariables: {
+    darkMode: false,
+    fontSize: '14px',
+    fontFamily: "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace",
+    background: '#ffffff',
+    mainBkg: '#f5f3ee',
+    primaryColor: '#f5f3ee',
+    primaryBorderColor: '#b4b2a9',
+    primaryTextColor: '#1a1917',
+    lineColor: '#444441',
+    textColor: '#1a1917',
+    edgeLabelBackground: '#ffffff',
+    attributeBackgroundColorEven: '#f5f3ee',
+    attributeBackgroundColorOdd: '#eceae3',
+  },
+});
+const { svg } = await mermaid.render('erd-svg', `erDiagram
+  SkillType {
+    int id PK
+    string name
+    string description
+  }
+  SkillValue {
+    int id PK
+    int skill_type_id FK
+    string value
+  }
+  ShiftGroup {
+    int id PK
+    string code
+    bool is_work_shift
+    bool is_night_shift
+  }
+  Shift {
+    int id PK
+    int group_id FK
+    string code
+    string name
+    int start_min
+    int end_min
+    int work_min
+    int break_min
+  }
+  StaffGroup {
+    int id PK
+    string name
+  }
+  Staff {
+    int id PK
+    int staff_group_id FK
+    string full_name
+    bool deleted
+  }
+  StaffSkill {
+    int staff_id FK
+    int skill_value_id FK
+  }
+  StaffPermittedShift {
+    int staff_id FK
+    int shift_id FK
+  }
+  Leave {
+    int id PK
+    int staff_id FK
+    date date
+    string shift_code
+    string note
+  }
+  Profile {
+    int id PK
+    string name
+    json config
+  }
+  ProfileStaff {
+    int profile_id FK
+    int staff_id FK
+    bool excluded
+  }
+  ProfileShift {
+    int profile_id FK
+    int shift_id FK
+  }
+  Roster {
+    int id PK
+    int profile_id FK
+    string name
+    string status
+    date roster_start
+    int num_days
+    json result
+  }
+  Demand {
+    int id PK
+    int roster_id FK
+    int skill_value_id FK
+    date date
+    int start_min
+    int end_min
+    int headcount
+  }
+
+  SkillType ||--o{ SkillValue : "has values"
+  SkillValue ||--o{ StaffSkill : "assigned via"
+  SkillValue ||--o{ Demand : "required by"
+  StaffGroup ||--o{ Staff : "contains"
+  Staff ||--o{ StaffSkill : "has"
+  Staff ||--o{ StaffPermittedShift : "permits"
+  Staff ||--o{ Leave : "applies"
+  Staff ||--o{ ProfileStaff : "in"
+  Shift ||--o{ StaffPermittedShift : "permitted for"
+  Shift ||--o{ ProfileShift : "in"
+  ShiftGroup ||--o{ Shift : "contains"
+  Profile ||--o{ ProfileStaff : "includes"
+  Profile ||--o{ ProfileShift : "uses"
+  Profile ||--o{ Roster : "generates"
+  Roster ||--o{ Demand : "has"
+`);
+document.getElementById('erd').innerHTML = svg;
+
+document.querySelectorAll('#erd svg .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+document.querySelectorAll('#erd svg .row-rect-odd path, #erd svg .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>
+</body>
+</html>
