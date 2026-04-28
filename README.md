@@ -25,20 +25,26 @@ docker compose -f docker-compose.dev.yml up --build
 
 ### 4. Run database migrations
 
-In a second terminal, once containers are up:
-
-alembic revision --autogenerate
-└── inspects SQLAlchemy models → generates migration file
-    (file appears in backend/alembic/versions/ on your host)
-
-alembic upgrade head
-└── runs migration file against postgres
-    └── creates all 14 tables + alembic_version tracking table
-
+In a second terminal, once all containers are up and healthy.
+ 
+**Step 1 — Generate the migration file**
+ 
+Inspects your SQLAlchemy models and writes a versioned script to `alembic/versions/`. Commit this file to Git.
+ 
 ```bash
 docker compose -f docker-compose.dev.yml exec backend alembic revision --autogenerate -m "initial schema"
-docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
 ```
+ 
+**Step 2 — Apply the migration**
+ 
+Runs the generated script against PostgreSQL and creates all 14 tables.
+ 
+```bash
+docker compose -f docker-compose.dev.yml exec backend \
+  alembic upgrade head
+```
+ 
+You only run Step 1 again when your models change. Step 2 is run whenever you want to apply pending migrations.
 
 ### 5. Open API docs
 
