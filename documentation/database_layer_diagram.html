@@ -12,9 +12,9 @@
 </style>
 </head>
 <body>
-<svg viewBox="0 0 680 610" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 680 630" xmlns="http://www.w3.org/2000/svg">
 
-  <rect width="680" height="610" fill="#1a1917"/>
+  <rect width="680" height="630" fill="#1a1917"/>
 
   <defs>
     <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -55,7 +55,7 @@
   <text x="38" y="254" font-family="'DM Sans',sans-serif" font-size="15" font-weight="500" fill="#cecbf6">Configuration</text>
   <text x="38" y="271" font-family="'DM Sans',sans-serif" font-size="12" fill="#afa9ec">Reusable solver settings — selected at generate time, shared across many roster runs</text>
 
-  <rect x="88" y="284" width="504" height="58" rx="8" fill="#3c3489" stroke="#7f77dd" stroke-width="0.5"/>
+  <rect x="68" y="284" width="544" height="58" rx="8" fill="#3c3489" stroke="#7f77dd" stroke-width="0.5"/>
   <text x="340" y="308" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#cecbf6">Profile</text>
   <text x="340" y="326" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#afa9ec">weights · constraints · time_limit · ProfileStaff (excluded) · ProfileShift</text>
 
@@ -64,34 +64,35 @@
   <line x1="340" y1="360" x2="363" y2="438" stroke="#888780" stroke-width="1.1" fill="none" marker-end="url(#arr)"/>
 
   <!-- LAYER 3: Roster execution -->
-  <rect x="20" y="400" width="640" height="208" rx="14" fill="#4a1b0c" stroke="#d85a30" stroke-width="1"/>
+  <rect x="20" y="400" width="640" height="220" rx="14" fill="#4a1b0c" stroke="#d85a30" stroke-width="1"/>
   <text x="38" y="426" font-family="'DM Sans',sans-serif" font-size="15" font-weight="500" fill="#f5c4b3">Roster execution</text>
   <text x="38" y="443" font-family="'DM Sans',sans-serif" font-size="12" fill="#f0997b">Created per solver run — stays as draft until approved; approved rosters chain automatically</text>
 
-  <rect x="38" y="456" width="200" height="100" rx="8" fill="#711b13" stroke="#d85a30" stroke-width="0.5"/>
-  <text x="138" y="480" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#f5c4b3">Roster</text>
-  <text x="138" y="497" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">name · status · dates</text>
-  <text x="138" y="513" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">result (JSON)</text>
-  <text x="138" y="529" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">profile_id FK</text>
+  <rect x="38" y="456" width="200" height="116" rx="8" fill="#711b13" stroke="#d85a30" stroke-width="0.5"/>
+  <text x="138" y="478" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#f5c4b3">Roster</text>
+  <text x="138" y="495" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">name · status · dates</text>
+  <text x="138" y="511" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">num_days · target_work_min</text>
+  <text x="138" y="527" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">result (JSON)</text>
+  <text x="138" y="543" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">profile_id FK</text>
 
-  <rect x="258" y="456" width="200" height="100" rx="8" fill="#711b13" stroke="#d85a30" stroke-width="0.5"/>
-  <text x="358" y="480" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#f5c4b3">Demand</text>
-  <text x="358" y="497" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">date · start/end · headcount</text>
-  <text x="358" y="513" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">skill_value_id FK (nullable)</text>
-  <text x="358" y="529" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">roster_id FK</text>
+  <rect x="258" y="456" width="200" height="116" rx="8" fill="#711b13" stroke="#d85a30" stroke-width="0.5"/>
+  <text x="358" y="478" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#f5c4b3">Demand</text>
+  <text x="358" y="495" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">date · start/end · headcount</text>
+  <text x="358" y="511" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">skill_value_id FK (nullable)</text>
+  <text x="358" y="527" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">roster_id FK</text>
 
-  <rect x="478" y="456" width="162" height="100" rx="8" fill="#711b13" stroke="#d85a30" stroke-width="0.5" stroke-dasharray="5 3"/>
-  <text x="559" y="480" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#f5c4b3">Job status</text>
-  <text x="559" y="500" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">in-memory only</text>
-  <text x="559" y="516" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">not persisted</text>
-  <text x="559" y="532" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">transient</text>
+  <rect x="478" y="456" width="162" height="116" rx="8" fill="#711b13" stroke="#d85a30" stroke-width="0.5" stroke-dasharray="5 3"/>
+  <text x="559" y="478" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#f5c4b3">Job status</text>
+  <text x="559" y="498" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">in-memory only</text>
+  <text x="559" y="514" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">not persisted</text>
+  <text x="559" y="530" text-anchor="middle" font-family="'DM Mono',monospace" font-size="11" fill="#f0997b">transient</text>
 
   <!-- Roster → Demand -->
-  <line x1="238" y1="508" x2="258" y2="508" stroke="#f0997b" stroke-width="1.1" fill="none" marker-end="url(#arr)"/>
+  <line x1="238" y1="514" x2="258" y2="514" stroke="#f0997b" stroke-width="1.1" fill="none" marker-end="url(#arr)"/>
 
   <!-- SkillValue → Demand cross-layer dashed -->
-  <path d="M108 556 L108 578 L358 578 L358 556" fill="none" stroke="#f0997b" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#arr-dash)"/>
-  <text x="233" y="594" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="11" fill="#f0997b">skill filter flows through to demand</text>
+  <path d="M108 572 L108 594 L358 594 L358 572" fill="none" stroke="#f0997b" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#arr-dash)"/>
+  <text x="233" y="608" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="11" fill="#f0997b">skill filter flows through to demand</text>
 
 </svg>
 </body>

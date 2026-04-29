@@ -97,6 +97,7 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
   Staff {
     int id PK
     int staff_group_id FK
+    string employee_id
     string full_name
     bool deleted
   }
@@ -136,6 +137,7 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     string status
     date roster_start
     int num_days
+    int target_work_min
     json result
   }
   Demand {

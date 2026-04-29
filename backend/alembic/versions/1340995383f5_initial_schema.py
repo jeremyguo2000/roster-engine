@@ -1,15 +1,15 @@
 """initial schema
 
-Revision ID: 125040607dc9
+Revision ID: 1340995383f5
 Revises: 
-Create Date: 2026-04-28 08:12:11.029836
+Create Date: 2026-04-29 08:56:25.059679
 """
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = '125040607dc9'
+revision: str = '1340995383f5'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -52,6 +52,7 @@ def upgrade() -> None:
     sa.Column('status', sa.Enum('running', 'draft', 'approved', 'failed', name='rosterstatus'), nullable=False),
     sa.Column('roster_start', sa.Date(), nullable=False),
     sa.Column('num_days', sa.Integer(), nullable=False),
+    sa.Column('target_work_min', sa.Integer(), nullable=False),
     sa.Column('result', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('celery_task_id', sa.String(), nullable=True),
     sa.ForeignKeyConstraint(['profile_id'], ['profile.id'], ondelete='RESTRICT'),
@@ -81,10 +82,12 @@ def upgrade() -> None:
     op.create_table('staff',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('staff_group_id', sa.Integer(), nullable=False),
+    sa.Column('employee_id', sa.String(), nullable=False),
     sa.Column('full_name', sa.String(), nullable=False),
     sa.Column('deleted', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['staff_group_id'], ['staff_group.id'], ondelete='RESTRICT'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('employee_id')
     )
     op.create_table('demand',
     sa.Column('id', sa.Integer(), nullable=False),

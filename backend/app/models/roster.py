@@ -28,6 +28,7 @@ class Roster(Base):
     )
     roster_start: Mapped[date] = mapped_column(Date, nullable=False)
     num_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_work_min: Mapped[int] = mapped_column(Integer, nullable=False)
     result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     celery_task_id: Mapped[str | None] = mapped_column(String, nullable=True)
 

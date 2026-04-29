@@ -77,7 +77,7 @@ class RosterContext:
     ----------
     carry_consec : dict mapping Staff to their consecutive working day count
                    at the end of the previous roster.
-    carry_shifts : dict mapping staff fullname to a (shift_group_code, days_ago)
+    carry_shifts : dict mapping staff id to a (shift_group_code, days_ago)
                    tuple representing the most recent shift assigned near the end
                    of the previous roster.
                    days_ago is a negative integer relative to the new roster start:
@@ -87,8 +87,8 @@ class RosterContext:
     Examples
     --------
     RosterContext(
-        carry_consec = {alice: 2, bob: 0, carol: 1},
-        carry_shifts = {"Carol Ng": ("NSG", -1), "David Koh": ("ESG", -2)},
+        carry_consec = {SN_1: 2, SN_2: 0, SN_3: 1},
+        carry_shifts = {"SN_3": ("NSG", -1), "SN_4": ("ESG", -2)},
     )
     """
     carry_consec: dict[str, int]             = field(default_factory=dict)
@@ -153,10 +153,6 @@ class RosterEngine:
                               if/then shift rules. Applied during solving and also
                               carried over across roster boundaries via RosterContext.
                               Defaults to an empty list (no rules).
-    num_days                : Length of the roster window in days, including any
-                              lookahead days. Default 7.
-    target_hours            : Exact working hours each staff member must accumulate
-                              over the roster window. Default 40.
     weight_overstaff        : Objective weight for minimising overstaffing spread
                               across days. Default 100.
     weight_consec           : Objective weight for minimising max consecutive working
@@ -175,8 +171,6 @@ class RosterEngine:
         shifts:                  list[Shift],
         staff_list:              list[Staff],
         conditional_constraints: list  = None,
-        num_days:                int   = 7,
-        target_hours:            float = 40,
         weight_consec:           int   = 100,
         weight_overstaff:        int   = 20,
         weight_burden:           int   = 10,
@@ -188,8 +182,6 @@ class RosterEngine:
         self.shifts                  = shifts
         self.staff_list              = staff_list
         self.conditional_constraints = conditional_constraints or []
-        self.num_days                = num_days
-        self.target_hours            = target_hours
         self.weight_overstaff        = weight_overstaff
         self.weight_consec           = weight_consec
         self.weight_burden           = weight_burden
@@ -201,10 +193,11 @@ class RosterEngine:
         self,
         leaves:       list[tuple[str, date]],
         roster_start: date,
+        num_days:     int, 
         shift_code:   str = "AL",
     ) -> list[tuple[int, int, int]]:
         """
-        Convert a list of (fullname, leave_date) tuples into pre_assignment
+        Convert a list of (employee_id, leave_date) tuples into pre_assignment
         index tuples (n, d, s) for use in generate_roster().
  
         Leave dates that fall outside the roster window [0, num_days) are
@@ -213,7 +206,7 @@ class RosterEngine:
  
         Parameters
         ----------
-        leaves       : List of (fullname, leave_date) tuples.
+        leaves       : List of (employee_id, leave_date) tuples.
         roster_start : The roster start date used to compute day index d.
         shift_code   : Shift code to assign. Defaults to "AL".
  
@@ -221,7 +214,7 @@ class RosterEngine:
         -------
         List of (n, d, s) index tuples ready to pass to generate_roster().
         """
-        staff_index = {staff.fullname: n for n, staff in enumerate(self.staff_list)}
+        staff_index = {staff.employee_id: n for n, staff in enumerate(self.staff_list)}
         shift_index = {shift.code: s for s, shift in enumerate(self.shifts)}
  
         if shift_code not in shift_index:
@@ -230,12 +223,12 @@ class RosterEngine:
         s = shift_index[shift_code]
         pre_assignments = []
  
-        for fullname, leave_date in leaves:
-            n = staff_index.get(fullname)
+        for employee_id, leave_date in leaves:
+            n = staff_index.get(employee_id)
             if n is None:
-                raise ValueError(f"Staff '{fullname}' not found")
+                raise ValueError(f"Staff '{employee_id}' not found")
             d = (leave_date - roster_start).days
-            if 0 <= d < self.num_days:
+            if 0 <= d < num_days:
                 pre_assignments.append((n, d, s))
  
         return pre_assignments
@@ -273,15 +266,15 @@ class RosterEngine:
         carry_shifts = {}
         
         for n, staff in enumerate(staff_list):
-            carry_consec[staff.fullname] = consec_days[n, last_day]
+            carry_consec[staff.employee_id] = consec_days[n, last_day]
  
             # Scan backwards to find the most recent assignment
             for d in range(last_day, -1, -1):
-                for (fullname, day, shift_code), val in assignments.items():
-                    if fullname == staff.fullname and day == d and val == 1:
+                for (employee_id, day, shift_code), val in assignments.items():
+                    if employee_id == staff.employee_id and day == d and val == 1:
                         shift = shift_map.get(shift_code)
                         if shift:
-                            carry_shifts[staff.fullname] = (
+                            carry_shifts[staff.employee_id] = (
                                 shift.shift_group.code,
                                 d - last_day - 1,  # negative offset relative to new roster start
                             )
@@ -300,6 +293,8 @@ class RosterEngine:
     def generate_roster(
         self,
         roster_start:    date,
+        num_days:        int,
+        target_work_min: float,
         demands:         list[Demand],
         pre_assignments: list[tuple[int, int, int]],
         context:         RosterContext | None = None,
@@ -310,6 +305,10 @@ class RosterEngine:
         Parameters
         ----------
         roster_start    : Calendar date of day 0 in the roster window.
+        num_days        : Length of the roster window in days, including any
+                          lookahead days.
+        target_hours    : Exact working hours each staff member must accumulate
+                          over the roster window.
         demands         : Demand objects with specific dates and headcount
                           requirements. Days with no demand are blocked from
                           receiving any work shift assignments (C8).
@@ -329,14 +328,12 @@ class RosterEngine:
         """
         shifts         = self.shifts
         staff_list     = self.staff_list
-        num_days       = self.num_days
-        target_minutes = int(self.target_hours * 60)
         time_limit_s   = self.time_limit_s
 
         num_staff  = len(staff_list)
         num_shifts = len(shifts)
         
-        staff_index = {staff.fullname: n for n, staff in enumerate(staff_list)}
+        staff_index = {staff.employee_id: n for n, staff in enumerate(staff_list)}
 
         weekends = [d for d in range(num_days)
                     if (roster_start + timedelta(days=d)).weekday() >= 5]
@@ -388,7 +385,7 @@ class RosterEngine:
                     x[n, d, s] * shifts[s].work_time
                     for d in range(num_days)
                     for s in range(num_shifts)
-                ) == target_minutes
+                ) == target_work_min
             )
 
         # Precompute C5: for each demand, the check points and which shifts
@@ -563,7 +560,7 @@ class RosterEngine:
                 consec_days[n, d] = model.NewIntVar(0, num_days, f"cr_n{n}_d{d}")
             
             # Consecutive working days from previous roster carry-over
-            carry = context.carry_consec.get(staff_list[n].fullname, 0) if context else 0
+            carry = context.carry_consec.get(staff_list[n].employee_id, 0) if context else 0
             if carry == 0:
                 model.Add(consec_days[n, 0] == worked_days[n, 0])
             else:
@@ -614,7 +611,7 @@ class RosterEngine:
             return None
 
         assignments = {
-            (staff_list[n].fullname, d, shifts[s].code): cp_solver.Value(x[n, d, s])
+            (staff_list[n].employee_id, d, shifts[s].code): cp_solver.Value(x[n, d, s])
             for n in range(num_staff)
             for d in range(num_days)
             for s in range(num_shifts)
@@ -671,7 +668,7 @@ def print_roster(result: dict) -> None:
             assigned = [
                 shift_code
                 for (name, day, shift_code), val in assignments.items()
-                if name == staff.fullname and day == d and val == 1
+                if name == staff.employee_id and day == d and val == 1
             ]
             row += f"{''.join(assigned) if assigned else '-':>8}"
         print(row)
@@ -742,16 +739,16 @@ def print_timetable(result: dict) -> None:
         for staff in staff_list:
             # Shift assigned on this day
             assigned_shift = None
-            for (name, day, shift_code), val in assignments.items():
-                if name == staff.fullname and day == d and val == 1:
+            for (emp_id, day, shift_code), val in assignments.items():
+                if emp_id == staff.employee_id and day == d and val == 1:
                     assigned_shift = shift_map.get(shift_code)
                     break
  
             # Overnight carryover from previous day
             prev_shift = None
             if d > 0:
-                for (name, day, shift_code), val in assignments.items():
-                    if name == staff.fullname and day == d - 1 and val == 1:
+                for (emp_id, day, shift_code), val in assignments.items():
+                    if emp_id == staff.employee_id and day == d - 1 and val == 1:
                         s = shift_map.get(shift_code)
                         if s and s.end_time <= s.start_time:  # overnight shift
                             prev_shift = s
@@ -815,8 +812,8 @@ def print_staff_summary(result: dict) -> None:
             day_date   = roster_start + timedelta(days=d)
             is_weekend = day_date.weekday() >= 5
 
-            for (name, day, shift_code), val in assignments.items():
-                if name == staff.fullname and day == d and val == 1:
+            for (emp_id, day, shift_code), val in assignments.items():
+                if emp_id == staff.employee_id and day == d and val == 1:
                     shift = shift_map.get(shift_code)
                     if shift:
                         total_work += shift.work_time

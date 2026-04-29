@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from datetime import timedelta
 
 from app.database import get_db
-from app.models import Roster, RosterStatus, Demand, Profile
+from app.models import Roster, RosterStatus, Demand, Profile, Leave
 from app.schemas.roster import RosterCreate, RosterOut
 from app.worker.tasks import run_solver
 
@@ -35,6 +36,7 @@ def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db)):
         status=RosterStatus.running,
         roster_start=body.roster_start,
         num_days=body.num_days,
+        target_work_min=body.target_work_min,
     )
     db.add(roster)
     db.flush()  # get roster.id before adding demands
@@ -44,11 +46,13 @@ def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(roster)
+ 
+    profile = db.get(Profile, body.profile_id)
+    time_limit = profile.config.get("time_limit", 600)
 
     task = run_solver.delay(
         roster_id=roster.id,
-        target_minutes=body.target_minutes,
-        time_limit=roster.profile.config.get("time_limit", 600),
+        time_limit=time_limit,
     )
     roster.celery_task_id = task.id
     db.commit()
@@ -62,6 +66,47 @@ def get_roster(roster_id: int, db: Session = Depends(get_db)):
     if not roster:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Roster not found.")
     return roster
+ 
+ 
+@router.get("/{roster_id}/leaves")
+def get_roster_leaves(roster_id: int, db: Session = Depends(get_db)):
+    """Preview which leaves will be applied as pre-assignments when the solver runs."""
+    roster = db.get(Roster, roster_id)
+    if not roster:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Roster not found.")
+ 
+    active_staff_ids = [
+        ps.staff_id for ps in roster.profile.profile_staff
+        if not ps.excluded and not ps.staff.deleted
+    ]
+ 
+    roster_dates = [
+        roster.roster_start + timedelta(days=i)
+        for i in range(roster.num_days)
+    ]
+ 
+    leaves = (
+        db.query(Leave)
+        .filter(
+            Leave.staff_id.in_(active_staff_ids),
+            Leave.date.in_(roster_dates),
+        )
+        .order_by(Leave.date, Leave.staff_id)
+        .all()
+    )
+ 
+    return [
+        {
+            "leave_id":    lv.id,
+            "staff_id":    lv.staff_id,
+            "employee_id": lv.staff.employee_id,
+            "full_name":   lv.staff.full_name,
+            "date":        lv.date.isoformat(),
+            "shift_code":  lv.shift_code,
+            "note":        lv.note,
+        }
+        for lv in leaves
+    ]
 
 
 @router.post("/{roster_id}/approve", response_model=RosterOut)

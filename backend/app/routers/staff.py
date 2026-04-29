@@ -127,6 +127,8 @@ def list_staff(
 def create_staff(body: StaffCreate, db: Session = Depends(get_db)):
     if not db.get(StaffGroup, body.staff_group_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff group not found.")
+    if db.query(Staff).filter_by(employee_id=body.employee_id).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Employee ID '{body.employee_id}' already exists.")
     s = Staff(**body.model_dump())
     db.add(s)
     db.commit()

@@ -10,4 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Source is mounted as a volume in dev — no COPY needed
+# Run as host user to avoid permission issues with generated files
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+RUN groupadd -g ${GROUP_ID} appuser && \
+    useradd -u ${USER_ID} -g ${GROUP_ID} -m appuser
+USER appuser
+
+# Source will be mounted as a volume in dev — no COPY needed

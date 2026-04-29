@@ -9,42 +9,43 @@ cp .env.example .env
 # Edit .env — set a strong POSTGRES_PASSWORD
 ```
 
-### 2. Copy your solver files
+### 2. Build the images with your user IDs
 
 ```bash
-cp /path/to/your/models.py backend/solver/models.py
-cp /path/to/your/solver.py backend/solver/solver.py
-touch backend/solver/__init__.py
+docker compose -f docker-compose.dev.yml build \
+  --build-arg USER_ID=$(id -u) \
+  --build-arg GROUP_ID=$(id -g)
 ```
 
 ### 3. Start all services
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 ### 4. Run database migrations
 
-In a second terminal, once all containers are up and healthy.
+Once all containers are up and healthy.
  
 **Step 1 — Generate the migration file**
  
-Inspects your SQLAlchemy models and writes a versioned script to `alembic/versions/`. Commit this file to Git.
+Inspects your SQLAlchemy models and writes a versioned script to `alembic/versions/`. 
+Commit this file to Git.
  
 ```bash
 docker compose -f docker-compose.dev.yml exec backend alembic revision --autogenerate -m "initial schema"
 ```
- 
+
 **Step 2 — Apply the migration**
  
-Runs the generated script against PostgreSQL and creates all 14 tables.
+Runs the generated script against PostgreSQL and creates all 15 tables.
  
 ```bash
-docker compose -f docker-compose.dev.yml exec backend \
-  alembic upgrade head
+docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
 ```
  
-You only run Step 1 again when your models change. Step 2 is run whenever you want to apply pending migrations.
+You only run Step 1 again when your models change. 
+Step 2 is run whenever you want to apply pending migrations.
 
 ### 5. Open API docs
 
@@ -64,22 +65,35 @@ You only run Step 1 again when your models change. Step 2 is run whenever you wa
 ## Useful commands
 
 ```bash
-# View logs for a specific service
+# View livestream logs for all services
+docker compose -f docker-compose.dev.yml logs -f
+
+# View livestream logs for a specific service
 docker compose -f docker-compose.dev.yml logs -f backend
 
 # Create a new migration after changing models
-docker compose -f docker-compose.dev.yml exec backend \
-  alembic revision --autogenerate -m "describe your change"
+docker compose -f docker-compose.dev.yml exec backend alembic revision --autogenerate -m "describe your change"
 
-# Apply migrations
+# Check current migration state
+docker compose -f docker-compose.dev.yml exec backend alembic current
+
+# Check migration history
+docker compose -f docker-compose.dev.yml exec backend alembic history
+
+# Apply pending migrations
 docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
 
 # Roll back one migration
 docker compose -f docker-compose.dev.yml exec backend alembic downgrade -1
 
 # Open a psql shell
-docker compose -f docker-compose.dev.yml exec postgres \
-  psql -U roster -d roster_engine
+docker compose -f docker-compose.dev.yml exec postgres psql -U roster -d roster_engine
+
+# Stop all containers
+docker compose -f docker-compose.dev.yml down
+
+# Stop and wipe the database volume (destructive — all data lost)
+docker compose -f docker-compose.dev.yml down -v
 ```
 
 ## API Route Summary
@@ -114,6 +128,7 @@ docker compose -f docker-compose.dev.yml exec postgres \
 | DELETE | `/api/profiles/{id}/shifts/{sid}` | Remove shift from profile |
 | GET/POST | `/api/rosters` | List / create+run roster |
 | GET | `/api/rosters/{id}` | Get roster (poll for status) |
+| GET | `/api/rosters/{id}/leaves` | Preview leaves applied to roster |
 | POST | `/api/rosters/{id}/approve` | Approve a draft roster |
 | POST | `/api/rosters/{id}/discard` | Discard a draft/failed roster |
 | DELETE | `/api/rosters/{id}` | Hard-delete a roster |

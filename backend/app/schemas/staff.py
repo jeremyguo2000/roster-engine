@@ -18,6 +18,7 @@ class StaffGroupOut(StaffGroupBase):
 
 class StaffBase(BaseModel):
     staff_group_id: int
+    employee_id: str
     full_name: str
 
 class StaffCreate(StaffBase):
@@ -25,6 +26,7 @@ class StaffCreate(StaffBase):
 
 class StaffUpdate(BaseModel):
     staff_group_id: int | None = None
+    employee_id: str | None = None
     full_name: str | None = None
 
 class StaffOut(StaffBase):

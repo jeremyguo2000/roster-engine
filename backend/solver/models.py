@@ -112,6 +112,7 @@ class Staff:
  
     Attributes
     ----------
+    employee_id      : Unique identifier for each staff. 
     fullname         : Human-readable name displayed in the roster.
     skillset         : List of Skill objects describing this staff member's capabilities.
                        Can be empty if no skill constraints are needed.
@@ -121,10 +122,11 @@ class Staff:
  
     Examples
     --------
-    Staff("Alice Tan", [Skill("seniority", "senior")], permitted_shifts=[shift_d078])   # shift_d078.code = "D078"
-    Staff("Bob Lim",   [Skill("seniority", "junior")])   # permitted = all shifts
-    Staff("Carol Ng",  [])
+    Staff("SN_1", "Alice Tan", [Skill("seniority", "senior")], permitted_shifts=[shift_d078])   # shift_d078.code = "D078"
+    Staff("SN_2", "Bob Lim",   [Skill("seniority", "junior")])                                  # permitted = all shifts
+    Staff("SN_3", "Carol Ng",  [])
     """
+    employee_id:      str
     fullname:         str
     skillset:         list[Skill] = field(default_factory=list)
     permitted_shifts: list[Shift] = field(default_factory=list)

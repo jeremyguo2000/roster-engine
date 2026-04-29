@@ -25,7 +25,7 @@ class RosterCreate(BaseModel):
     name: str
     roster_start: date
     num_days: int
-    target_minutes: int
+    target_work_min: int
     demands: list[DemandCreate]
 
 class RosterOut(BaseModel):
@@ -35,6 +35,7 @@ class RosterOut(BaseModel):
     status: RosterStatus
     roster_start: date
     num_days: int
+    target_work_min: int
     result: dict | None
     celery_task_id: str | None
     demands: list[DemandOut] = []

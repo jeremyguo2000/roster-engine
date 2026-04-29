@@ -20,6 +20,7 @@ class Staff(Base):
     staff_group_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("staff_group.id", ondelete="RESTRICT"), nullable=False
     )
+    employee_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     full_name: Mapped[str] = mapped_column(String, nullable=False)
     deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
