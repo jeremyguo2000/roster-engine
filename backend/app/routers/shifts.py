@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.models import ShiftGroup, Shift
@@ -46,8 +47,20 @@ def delete_shift_group(group_id: int, db: Session = Depends(get_db)):
     sg = db.get(ShiftGroup, group_id)
     if not sg:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Shift group not found.")
-    db.delete(sg)
-    db.commit()
+    if sg.shifts:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete a shift group that still has shifts. Delete or reassign the shifts first."
+        )
+    try:
+        db.delete(sg)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete this shift group — it is referenced by other records."
+        )
 
 
 # ── Shifts ───────────────────────────────────────────────────────────
@@ -98,5 +111,18 @@ def delete_shift(shift_id: int, db: Session = Depends(get_db)):
     shift = db.get(Shift, shift_id)
     if not shift:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Shift not found.")
-    db.delete(shift)
-    db.commit()
+    if shift.permitted_staff or shift.profile_shifts:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete a shift that is assigned to staff or profiles. Remove those assignments first."
+        )
+    try:
+        db.delete(shift)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete this shift — it is referenced by other records."
+        )
+

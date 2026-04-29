@@ -56,6 +56,57 @@ def delete_staff_group(group_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
+# ── Leaves ───────────────────────────────────────────────────────────
+
+@router.get("/leaves", response_model=list[LeaveOut])
+def list_leaves(
+    staff_id: int | None = None,
+    from_date: date_type | None = None,
+    to_date: date_type | None = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(Leave)
+    if staff_id:
+        q = q.filter_by(staff_id=staff_id)
+    if from_date:
+        q = q.filter(Leave.date >= from_date)
+    if to_date:
+        q = q.filter(Leave.date <= to_date)
+    return q.order_by(Leave.date).all()
+
+
+@router.post("/leaves", response_model=LeaveOut, status_code=status.HTTP_201_CREATED)
+def create_leave(body: LeaveCreate, db: Session = Depends(get_db)):
+    if not db.get(Staff, body.staff_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
+    leave = Leave(**body.model_dump())
+    db.add(leave)
+    db.commit()
+    db.refresh(leave)
+    return leave
+
+
+@router.patch("/leaves/{leave_id}", response_model=LeaveOut)
+def update_leave(leave_id: int, body: LeaveUpdate, db: Session = Depends(get_db)):
+    leave = db.get(Leave, leave_id)
+    if not leave:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Leave not found.")
+    for field, value in body.model_dump(exclude_none=True).items():
+        setattr(leave, field, value)
+    db.commit()
+    db.refresh(leave)
+    return leave
+
+
+@router.delete("/leaves/{leave_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_leave(leave_id: int, db: Session = Depends(get_db)):
+    leave = db.get(Leave, leave_id)
+    if not leave:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Leave not found.")
+    db.delete(leave)
+    db.commit()
+
+
 # ── Staff ────────────────────────────────────────────────────────────
 
 @router.get("", response_model=list[StaffOut])
@@ -173,55 +224,4 @@ def remove_permitted_shift(staff_id: int, shift_id: int, db: Session = Depends(g
     if not ps:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Permitted shift not found.")
     db.delete(ps)
-    db.commit()
-
-
-# ── Leaves ───────────────────────────────────────────────────────────
-
-@router.get("/leaves", response_model=list[LeaveOut])
-def list_leaves(
-    staff_id: int | None = None,
-    from_date: date_type | None = None,
-    to_date: date_type | None = None,
-    db: Session = Depends(get_db),
-):
-    q = db.query(Leave)
-    if staff_id:
-        q = q.filter_by(staff_id=staff_id)
-    if from_date:
-        q = q.filter(Leave.date >= from_date)
-    if to_date:
-        q = q.filter(Leave.date <= to_date)
-    return q.order_by(Leave.date).all()
-
-
-@router.post("/leaves", response_model=LeaveOut, status_code=status.HTTP_201_CREATED)
-def create_leave(body: LeaveCreate, db: Session = Depends(get_db)):
-    if not db.get(Staff, body.staff_id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
-    leave = Leave(**body.model_dump())
-    db.add(leave)
-    db.commit()
-    db.refresh(leave)
-    return leave
-
-
-@router.patch("/leaves/{leave_id}", response_model=LeaveOut)
-def update_leave(leave_id: int, body: LeaveUpdate, db: Session = Depends(get_db)):
-    leave = db.get(Leave, leave_id)
-    if not leave:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Leave not found.")
-    for field, value in body.model_dump(exclude_none=True).items():
-        setattr(leave, field, value)
-    db.commit()
-    db.refresh(leave)
-    return leave
-
-
-@router.delete("/leaves/{leave_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_leave(leave_id: int, db: Session = Depends(get_db)):
-    leave = db.get(Leave, leave_id)
-    if not leave:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Leave not found.")
-    db.delete(leave)
     db.commit()
