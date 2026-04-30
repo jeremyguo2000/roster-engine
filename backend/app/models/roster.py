@@ -1,7 +1,7 @@
 import enum
 from datetime import date
 
-from sqlalchemy import Integer, String, Date, ForeignKey, Enum
+from sqlalchemy import Integer, String, Date, ForeignKey, Enum, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,8 +33,8 @@ class Roster(Base):
     celery_task_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     profile: Mapped["Profile"] = relationship("Profile", back_populates="rosters")  # noqa: F821
-    demands: Mapped[list["Demand"]] = relationship(
-        "Demand", back_populates="roster", cascade="all, delete-orphan"
+    roster_demands: Mapped[list["RosterDemand"]] = relationship(
+        "RosterDemand", back_populates="roster", cascade="all, delete-orphan"
     )
 
 
@@ -42,9 +42,6 @@ class Demand(Base):
     __tablename__ = "demand"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    roster_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("roster.id", ondelete="CASCADE"), nullable=False
-    )
     skill_value_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("skill_value.id", ondelete="RESTRICT"), nullable=True
     )
@@ -53,7 +50,24 @@ class Demand(Base):
     end_min: Mapped[int] = mapped_column(Integer, nullable=False)
     headcount: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    roster: Mapped["Roster"] = relationship("Roster", back_populates="demands")
     skill_value: Mapped["SkillValue | None"] = relationship(  # noqa: F821
         "SkillValue", back_populates="demands"
     )
+    roster_demands: Mapped[list["RosterDemand"]] = relationship(
+        "RosterDemand", back_populates="demand"
+    )
+
+
+class RosterDemand(Base):
+    __tablename__ = "roster_demand"
+    __table_args__ = (UniqueConstraint("roster_id", "demand_id", name="uq_roster_demand"),)
+
+    roster_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("roster.id", ondelete="CASCADE"), primary_key=True
+    )
+    demand_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("demand.id", ondelete="RESTRICT"), primary_key=True
+    )
+
+    roster: Mapped["Roster"] = relationship("Roster", back_populates="roster_demands")
+    demand: Mapped["Demand"] = relationship("Demand", back_populates="roster_demands")

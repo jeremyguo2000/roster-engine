@@ -36,13 +36,17 @@ Commit this file to Git.
 docker compose -f docker-compose.dev.yml exec backend alembic revision --autogenerate -m "initial schema"
 ```
 
+> ⚠️ Always review the generated migration file before applying. Alembic autogenerate may incorrectly include duplicate `op.create_unique_constraint` lines that already exist in a previous migration. Remove them before running Step 2.
+
 **Step 2 — Apply the migration**
  
-Runs the generated script against PostgreSQL and creates all 15 tables.
+Runs the generated script against PostgreSQL and creates all 16 tables.
  
 ```bash
 docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
 ```
+
+> ⚠️ When downgrading, ensure the initial schema migration's `downgrade()` includes `op.execute('DROP TYPE IF EXISTS rosterstatus')` to avoid orphaned enum types on re-migration.
  
 You only run Step 1 again when your models change. 
 Step 2 is run whenever you want to apply pending migrations.
@@ -70,6 +74,7 @@ docker compose -f docker-compose.dev.yml logs -f
 
 # View livestream logs for a specific service
 docker compose -f docker-compose.dev.yml logs -f backend
+docker compose -f docker-compose.dev.yml logs -f celery_worker
 
 # Create a new migration after changing models
 docker compose -f docker-compose.dev.yml exec backend alembic revision --autogenerate -m "describe your change"
@@ -126,8 +131,11 @@ docker compose -f docker-compose.dev.yml down -v
 | DELETE | `/api/profiles/{id}/staff/{sid}` | Remove staff from profile |
 | GET/POST | `/api/profiles/{id}/shifts` | List / add shifts to profile |
 | DELETE | `/api/profiles/{id}/shifts/{sid}` | Remove shift from profile |
+| GET/POST | `/api/demands` | List / create demands |
+| GET | `/api/demands/{id}` | Get a specific demand |
 | GET/POST | `/api/rosters` | List / create+run roster |
 | GET | `/api/rosters/{id}` | Get roster (poll for status) |
+| GET | `/api/rosters/{id}/demands` | Get demands linked to a roster |
 | GET | `/api/rosters/{id}/leaves` | Preview leaves applied to roster |
 | POST | `/api/rosters/{id}/approve` | Approve a draft roster |
 | POST | `/api/rosters/{id}/discard` | Discard a draft/failed roster |

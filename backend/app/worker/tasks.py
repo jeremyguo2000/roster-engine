@@ -3,17 +3,17 @@ from datetime import timedelta
 
 from app.database import SessionLocal
 from app.models import (
-    Roster, RosterStatus, Leave, Profile, 
-    Shift, ShiftGroup, SkillValue,
+    Roster, RosterStatus, Leave, Profile,
+    Shift, ShiftGroup, SkillValue, RosterDemand,
 )
 from app.worker.celery_app import celery_app
 
 from solver.models import (
-    Shift      as SolverShift,
+    Shift     as SolverShift,
     ShiftGroup as SolverShiftGroup,
-    Staff      as SolverStaff,
-    Skill      as SolverSkill,
-    Demand     as SolverDemand,
+    Staff     as SolverStaff,
+    Skill     as SolverSkill,
+    Demand    as SolverDemand,
 )
 from solver.solver import RosterEngine, ConditionalConstraint
 
@@ -72,7 +72,7 @@ def _build_solver_inputs(db, roster: Roster):
                     value=sv.value,
                 ))
 
-        # Permitted shifts — None rows = all permitted
+        # No permitted_shift rows = all shifts permitted
         if s.permitted_shifts:
             permitted = [
                 solver_shifts[ps2.shift_id]
@@ -91,7 +91,8 @@ def _build_solver_inputs(db, roster: Roster):
 
     # ── Demands ─────────────────────────────────────────────────────
     solver_demands = []
-    for d in roster.demands:
+    for rd in roster.roster_demands:
+        d = rd.demand
         skill_filter = None
         if d.skill_value_id:
             sv = db.get(SkillValue, d.skill_value_id)
@@ -108,7 +109,7 @@ def _build_solver_inputs(db, roster: Roster):
             skillset_required=[skill_filter] if skill_filter else [],
         ))
 
-    # ── Leaves as (employee_id, date) tuples ───────────────────────────
+    # ── Leaves as (employee_id, date) tuples ────────────────────────
     roster_dates = {
         roster.roster_start + timedelta(days=i)
         for i in range(roster.num_days)
@@ -122,7 +123,7 @@ def _build_solver_inputs(db, roster: Roster):
         )
         .all()
     )
-    staff_id_to_employee_id = {s.id: s.employee_id  for s in staff_db_list}
+    staff_id_to_employee_id = {s.id: s.employee_id for s in staff_db_list}
     leave_tuples = [
         (staff_id_to_employee_id[lv.staff_id], lv.date)
         for lv in leaves_db
@@ -142,7 +143,7 @@ def _result_to_json(result: dict) -> dict:
     consec_days_raw = result.get("consec_days", {})
     staff_list      = result["staff"]
     num_days        = result["num_days"]
-    
+
     staff_max_consec = {}
     for n, s in enumerate(staff_list):
         if consec_days_raw:
@@ -188,7 +189,6 @@ def run_solver(self, roster_id: int, time_limit: int = 600):
 
         shifts, staff, demands, leave_tuples = _build_solver_inputs(db, roster)
 
-        # Build conditional constraints from profile config
         ccs = [
             ConditionalConstraint(
                 trigger=cc["trigger"],

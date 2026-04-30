@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Roster Engine — ERD</title>
+<title>Roster Engine — ERD v2</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,16 +33,14 @@
 </head>
 <body>
 
-<h1>Roster Engine — Entity Relationship Diagram</h1>
-<p>All 15 tables and their relationships.</p>
+<h1>Roster Engine — Entity Relationship Diagram v2</h1>
+<p>16 tables and their relationships. Key change from v1: <code>Demand</code> is now a standalone reusable entity linked to rosters via the <code>RosterDemand</code> junction table.</p>
 
 <div id="erd" style="padding: 1rem 0"></div>
 
 <script type="module">
 import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
-
 await document.fonts.ready;
-
 mermaid.initialize({
   startOnLoad: false,
   theme: 'base',
@@ -64,6 +62,24 @@ mermaid.initialize({
   },
 });
 const { svg } = await mermaid.render('erd-svg', `erDiagram
+  SkillType ||--o{ SkillValue : "has values"
+  StaffGroup ||--o{ Staff : "contains"
+  ShiftGroup ||--o{ Shift : "contains"
+
+  SkillValue ||--o{ Demand : "required by"
+  Staff ||--o{ StaffSkill : "has"
+  Staff ||--o{ Leave : "applies"
+  Shift ||--o{ StaffPermittedShift : "permitted for"
+  Staff ||--o{ StaffPermittedShift : "permits"
+  Profile ||--o{ ProfileStaff : "includes"
+  Staff ||--o{ ProfileStaff : "in"
+  Profile ||--o{ ProfileShift : "uses"
+  Shift ||--o{ ProfileShift : "in"
+  Profile ||--o{ Roster : "generates"
+  SkillValue ||--o{ StaffSkill : "assigned via"
+  Roster ||--o{ RosterDemand : "references"
+  Demand ||--o{ RosterDemand : "used by"
+
   SkillType {
     int id PK
     string name
@@ -73,6 +89,17 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     int id PK
     int skill_type_id FK
     string value
+  }
+  StaffGroup {
+    int id PK
+    string name
+  }
+  Staff {
+    int id PK
+    int staff_group_id FK
+    string employee_id
+    string full_name
+    bool deleted
   }
   ShiftGroup {
     int id PK
@@ -90,45 +117,10 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     int work_min
     int break_min
   }
-  StaffGroup {
-    int id PK
-    string name
-  }
-  Staff {
-    int id PK
-    int staff_group_id FK
-    string employee_id
-    string full_name
-    bool deleted
-  }
-  StaffSkill {
-    int staff_id FK
-    int skill_value_id FK
-  }
-  StaffPermittedShift {
-    int staff_id FK
-    int shift_id FK
-  }
-  Leave {
-    int id PK
-    int staff_id FK
-    date date
-    string shift_code
-    string note
-  }
   Profile {
     int id PK
     string name
     json config
-  }
-  ProfileStaff {
-    int profile_id FK
-    int staff_id FK
-    bool excluded
-  }
-  ProfileShift {
-    int profile_id FK
-    int shift_id FK
   }
   Roster {
     int id PK
@@ -142,29 +134,40 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
   }
   Demand {
     int id PK
-    int roster_id FK
     int skill_value_id FK
     date date
     int start_min
     int end_min
     int headcount
   }
-
-  SkillType ||--o{ SkillValue : "has values"
-  SkillValue ||--o{ StaffSkill : "assigned via"
-  SkillValue ||--o{ Demand : "required by"
-  StaffGroup ||--o{ Staff : "contains"
-  Staff ||--o{ StaffSkill : "has"
-  Staff ||--o{ StaffPermittedShift : "permits"
-  Staff ||--o{ Leave : "applies"
-  Staff ||--o{ ProfileStaff : "in"
-  Shift ||--o{ StaffPermittedShift : "permitted for"
-  Shift ||--o{ ProfileShift : "in"
-  ShiftGroup ||--o{ Shift : "contains"
-  Profile ||--o{ ProfileStaff : "includes"
-  Profile ||--o{ ProfileShift : "uses"
-  Profile ||--o{ Roster : "generates"
-  Roster ||--o{ Demand : "has"
+  StaffSkill {
+    int staff_id FK
+    int skill_value_id FK
+  }
+  Leave {
+    int id PK
+    int staff_id FK
+    date date
+    string shift_code
+    string note
+  }
+  StaffPermittedShift {
+    int staff_id FK
+    int shift_id FK
+  }
+  ProfileStaff {
+    int profile_id FK
+    int staff_id FK
+    bool excluded
+  }
+  ProfileShift {
+    int profile_id FK
+    int shift_id FK
+  }
+  RosterDemand {
+    int roster_id FK
+    int demand_id FK
+  }
 `);
 document.getElementById('erd').innerHTML = svg;
 
