@@ -57,6 +57,8 @@ def delete_staff_group(group_id: int, db: Session = Depends(get_db)):
 
 
 # ── Leaves ───────────────────────────────────────────────────────────
+# NOTE: these must be defined BEFORE /{staff_id} routes to avoid
+# FastAPI matching "leaves" as a staff_id integer parameter.
 
 @router.get("/leaves", response_model=list[LeaveOut])
 def list_leaves(
@@ -181,6 +183,21 @@ def restore_staff(staff_id: int, db: Session = Depends(get_db)):
 
 # ── Staff Skills ─────────────────────────────────────────────────────
 
+@router.get("/{staff_id}/skills")
+def get_staff_skills(staff_id: int, db: Session = Depends(get_db)):
+    s = db.get(Staff, staff_id)
+    if not s:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
+    return [
+        {
+            "skill_value_id": ss.skill_value_id,
+            "skill_type":     ss.skill_value.skill_type.name,
+            "value":          ss.skill_value.value,
+        }
+        for ss in s.skills
+    ]
+
+
 @router.post("/{staff_id}/skills", status_code=status.HTTP_201_CREATED)
 def add_staff_skill(staff_id: int, body: StaffSkillAdd, db: Session = Depends(get_db)):
     if not db.get(Staff, staff_id):
@@ -205,6 +222,27 @@ def remove_staff_skill(staff_id: int, skill_value_id: int, db: Session = Depends
 
 
 # ── Permitted Shifts ─────────────────────────────────────────────────
+
+@router.get("/{staff_id}/permitted-shifts")
+def get_permitted_shifts(staff_id: int, db: Session = Depends(get_db)):
+    s = db.get(Staff, staff_id)
+    if not s:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
+    if not s.permitted_shifts:
+        return {"note": "No restrictions — all shifts permitted", "permitted_shifts": []}
+    return {
+        "note": "Restricted to listed shifts only",
+        "permitted_shifts": [
+            {
+                "shift_id":   ps.shift_id,
+                "shift_code": ps.shift.code,
+                "shift_name": ps.shift.name,
+                "group":      ps.shift.group.code,
+            }
+            for ps in s.permitted_shifts
+        ]
+    }
+
 
 @router.post("/{staff_id}/permitted-shifts", status_code=status.HTTP_201_CREATED)
 def add_permitted_shift(staff_id: int, body: StaffPermittedShiftAdd, db: Session = Depends(get_db)):

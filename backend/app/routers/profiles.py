@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Profile, ProfileStaff, ProfileShift, Staff, Shift, StaffGroup
+from app.models import Profile, ProfileStaff, ProfileShift, Staff, Shift, StaffGroup, ShiftGroup
 from app.schemas.profile import (
     ProfileCreate, ProfileUpdate, ProfileOut,
     ProfileStaffAdd, ProfileStaffOut, ProfileStaffUpdate,
@@ -50,11 +50,24 @@ def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(g
 
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_profile(profile_id: int, db: Session = Depends(get_db)):
+    from sqlalchemy.exc import IntegrityError
     p = db.get(Profile, profile_id)
     if not p:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
-    db.delete(p)
-    db.commit()
+    if p.rosters:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete a profile that has rosters. Delete or discard all rosters first."
+        )
+    try:
+        db.delete(p)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete this profile — it is referenced by other records."
+        )
 
 
 # ── Profile Staff ────────────────────────────────────────────────────
@@ -148,6 +161,24 @@ def add_profile_shift(profile_id: int, body: ProfileShiftAdd, db: Session = Depe
     db.commit()
     db.refresh(ps)
     return ps
+
+
+@router.post("/{profile_id}/shifts/add-group/{group_id}", status_code=status.HTTP_201_CREATED)
+def add_shift_group_to_profile(profile_id: int, group_id: int, db: Session = Depends(get_db)):
+    """Bulk-add all shifts from a shift group into the profile."""
+    if not db.get(Profile, profile_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
+    group = db.get(ShiftGroup, group_id)
+    if not group:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Shift group not found.")
+    added = 0
+    for shift in group.shifts:
+        existing = db.query(ProfileShift).filter_by(profile_id=profile_id, shift_id=shift.id).first()
+        if not existing:
+            db.add(ProfileShift(profile_id=profile_id, shift_id=shift.id))
+            added += 1
+    db.commit()
+    return {"added": added}
 
 
 @router.delete("/{profile_id}/shifts/{shift_id}", status_code=status.HTTP_204_NO_CONTENT)

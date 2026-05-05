@@ -9,7 +9,7 @@ from solver.models import Demand, Shift, Staff
 # Private helpers
 # ---------------------------------------------------------------------------
 
-def _shift_covers_checkpoint(shift: Shift, checkpoint: int) -> bool:
+def _shift_covers_checkpoint(shift: Shift, checkpoint: int) -> tuple[bool, int]: # bool:
     """
     Determine whether a given shift covers a specific time checkpoint.
  
@@ -19,11 +19,20 @@ def _shift_covers_checkpoint(shift: Shift, checkpoint: int) -> bool:
     """
     s_start = shift.start_time
     s_end   = shift.end_time
+    is_overnight = s_end <= s_start
 
-    if s_end <= s_start:
-        s_end += 1440   # overnight: extend into next day
+    # Carryover case: overnight shift from day d-1 covers early hours of day d
+    # checkpoint falls in [0, s_end) using raw end_time
+    if is_overnight and checkpoint < s_end:
+        return True, -1
 
-    return s_start <= checkpoint and checkpoint < s_end
+    # Same-day case: shift covers checkpoint within its own day
+    if is_overnight:
+        s_end += 1440  # extend for same-day coverage check
+    if s_start <= checkpoint < s_end:
+        return True, 0
+
+    return False, 0
 
 
 def _check_points(demand: Demand, shifts: list[Shift]) -> set[int]:
@@ -44,11 +53,6 @@ def _check_points(demand: Demand, shifts: list[Shift]) -> set[int]:
     for shift in shifts:
         s_start = shift.start_time
         s_end = shift.end_time
-        
-        if s_end <= s_start:
-            s_end += 1440
-        if s_start <= d_start:
-            s_start += 1440 if shift.end_time <= shift.start_time else 0
             
         if d_start < s_start < d_end:
             points.add(s_start)
@@ -395,10 +399,13 @@ class RosterEngine:
         for d in range(num_days):
             for demand in _demands_for_day(demands, roster_start, d):
                 for point in _check_points(demand, shifts):
-                    covering = [
-                        s for s in work_shifts
-                        if _shift_covers_checkpoint(shifts[s], point)
-                    ]
+                    covering = []
+                    for shift_idx in work_shifts:
+                        covers, day_offset = _shift_covers_checkpoint(shifts[shift_idx], point)
+                        if covers:
+                            shift_day = d + day_offset
+                            if 0 <= shift_day < num_days:
+                                covering.append((shift_idx, day_offset))
                     demand_coverage.append((d, demand, covering))
                     
         # C5 — Demand coverage at each boundary check point
@@ -409,9 +416,9 @@ class RosterEngine:
             if not demand.skillset_required:
                 model.Add(
                     sum(
-                        x[n, d, s]
+                        x[n, d + day_offset, shift_idx]
                         for n in range(num_staff)
-                        for s in covering
+                        for shift_idx, day_offset in covering
                     ) >= demand.headcount
                 )
             else:
@@ -421,9 +428,9 @@ class RosterEngine:
                 ]
                 model.Add(
                     sum(
-                        x[n, d, s]
+                        x[n, d + day_offset, shift_idx]
                         for n in eligible
-                        for s in covering
+                        for shift_idx, day_offset in covering
                     ) >= demand.headcount
                 )
 

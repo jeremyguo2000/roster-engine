@@ -76,6 +76,9 @@ docker compose -f docker-compose.dev.yml logs -f
 docker compose -f docker-compose.dev.yml logs -f backend
 docker compose -f docker-compose.dev.yml logs -f celery_worker
 
+# Restart celery worker after code changes (no auto-reload)
+docker compose -f docker-compose.dev.yml restart celery_worker
+
 # Create a new migration after changing models
 docker compose -f docker-compose.dev.yml exec backend alembic revision --autogenerate -m "describe your change"
 
@@ -130,6 +133,7 @@ docker compose -f docker-compose.dev.yml down -v
 | PATCH | `/api/profiles/{id}/staff/{sid}` | Toggle excluded flag |
 | DELETE | `/api/profiles/{id}/staff/{sid}` | Remove staff from profile |
 | GET/POST | `/api/profiles/{id}/shifts` | List / add shifts to profile |
+| POST | `/api/profiles/{id}/shifts/add-group/{gid}` | Bulk-add shift group to profile | 
 | DELETE | `/api/profiles/{id}/shifts/{sid}` | Remove shift from profile |
 | GET/POST | `/api/demands` | List / create demands |
 | GET | `/api/demands/{id}` | Get a specific demand |

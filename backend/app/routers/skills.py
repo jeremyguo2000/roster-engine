@@ -43,11 +43,24 @@ def update_skill_type(type_id: int, body: SkillTypeUpdate, db: Session = Depends
 
 @router.delete("/types/{type_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_skill_type(type_id: int, db: Session = Depends(get_db)):
+    from sqlalchemy.exc import IntegrityError
     st = db.get(SkillType, type_id)
     if not st:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Skill type not found.")
-    db.delete(st)
-    db.commit()
+    if st.values:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete a skill type that still has values. Delete all values first."
+        )
+    try:
+        db.delete(st)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete this skill type — it is referenced by other records."
+        )
 
 
 # ── Skill Values ─────────────────────────────────────────────────────
@@ -69,8 +82,26 @@ def add_skill_value(type_id: int, body: SkillValueCreate, db: Session = Depends(
 
 @router.delete("/types/{type_id}/values/{value_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_skill_value(type_id: int, value_id: int, db: Session = Depends(get_db)):
+    from sqlalchemy.exc import IntegrityError
     sv = db.query(SkillValue).filter_by(id=value_id, skill_type_id=type_id).first()
     if not sv:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Skill value not found.")
-    db.delete(sv)
-    db.commit()
+    if sv.staff_skills:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete a skill value that is assigned to staff members."
+        )
+    if sv.demands:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete a skill value that is referenced by demands."
+        )
+    try:
+        db.delete(sv)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot delete this skill value — it is referenced by other records."
+        )
