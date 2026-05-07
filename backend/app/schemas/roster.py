@@ -17,17 +17,9 @@ class DemandCreate(DemandBase):
 class DemandOut(DemandBase):
     id: int
     model_config = {"from_attributes": True}
- 
- 
-class RosterCreate(BaseModel):
-    profile_id: int
-    name: str
-    roster_start: date
-    num_days: int
-    target_work_min: int
-    demand_ids: list[int]
- 
-class RosterOut(BaseModel):
+    
+
+class RosterListItem(BaseModel):
     id: int
     profile_id: int
     name: str
@@ -35,7 +27,18 @@ class RosterOut(BaseModel):
     roster_start: date
     num_days: int
     target_work_min: int
-    result: dict | None
     celery_task_id: str | None
     model_config = {"from_attributes": True}
+        
+class RosterCreate(BaseModel):
+    profile_id: int
+    name: str
+    roster_start: date
+    num_days: int
+    target_work_min: int
+    demand_ids: list[int]
+    previous_roster_id: int | None = None
+ 
+class RosterOut(RosterListItem):
+    result: dict | None
  

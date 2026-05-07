@@ -1,19 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from app.database import get_db
 from app.models import Roster, RosterStatus, RosterDemand, Demand, Profile, Leave
-from app.schemas.roster import RosterCreate, RosterOut, DemandOut
+from app.schemas.roster import RosterListItem, RosterCreate, RosterOut, DemandOut
 from app.worker.tasks import run_solver
 
 router = APIRouter(prefix="/rosters", tags=["Rosters"])
 
 
-@router.get("", response_model=list[RosterOut])
+@router.get("", response_model=list[RosterListItem])
 def list_rosters(
     status: RosterStatus | None = None,
     profile_id: int | None = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     q = db.query(Roster)
@@ -21,7 +23,7 @@ def list_rosters(
         q = q.filter(Roster.status == status)
     if profile_id:
         q = q.filter_by(profile_id=profile_id)
-    return q.order_by(Roster.roster_start.desc()).all()
+    return q.order_by(Roster.roster_start.desc()).offset(offset).limit(limit).all()
 
 
 @router.post("", response_model=RosterOut, status_code=status.HTTP_201_CREATED)
@@ -36,6 +38,20 @@ def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db)):
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND,
                 f"Demand id {demand_id} not found."
+            )
+ 
+    # Validate previous_roster_id if provided
+    if body.previous_roster_id:
+        prev = db.get(Roster, body.previous_roster_id)
+        if not prev:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                f"Previous roster id {body.previous_roster_id} not found."
+            )
+        if not prev.result or "assignments" not in (prev.result or {}):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"Previous roster {body.previous_roster_id} has no usable result to chain from."
             )
 
     roster = Roster(
@@ -61,6 +77,7 @@ def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db)):
     task = run_solver.delay(
         roster_id=roster.id,
         time_limit=time_limit,
+        previous_roster_id=body.previous_roster_id,
     )
     roster.celery_task_id = task.id
     db.commit()

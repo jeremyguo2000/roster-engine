@@ -1,6 +1,6 @@
 from datetime import date as date_type
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -65,6 +65,8 @@ def list_leaves(
     staff_id: int | None = None,
     from_date: date_type | None = None,
     to_date: date_type | None = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     q = db.query(Leave)
@@ -74,7 +76,7 @@ def list_leaves(
         q = q.filter(Leave.date >= from_date)
     if to_date:
         q = q.filter(Leave.date <= to_date)
-    return q.order_by(Leave.date).all()
+    return q.order_by(Leave.date).offset(offset).limit(limit).all()
 
 
 @router.post("/leaves", response_model=LeaveOut, status_code=status.HTTP_201_CREATED)

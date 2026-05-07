@@ -79,24 +79,30 @@ class RosterContext:
  
     Attributes
     ----------
-    carry_consec : dict mapping Staff to their consecutive working day count
-                   at the end of the previous roster.
-    carry_shifts : dict mapping staff id to a (shift_group_code, days_ago)
-                   tuple representing the most recent shift assigned near the end
-                   of the previous roster.
-                   days_ago is a negative integer relative to the new roster start:
-                   -1 = assigned on the last day, -2 = second-to-last day, etc.
-                   Staff with no assignments in the previous roster are absent.
+    carry_consec       : dict mapping Staff to their consecutive working day count
+                         at the end of the previous roster.
+    carry_shifts       : dict mapping staff id to a (shift_group_code, days_ago)
+                         tuple representing the most recent shift assigned near the end
+                         of the previous roster.
+                         days_ago is a negative integer relative to the new roster start:
+                         -1 = assigned on the last day, -2 = second-to-last day, etc.
+                         Staff with no assignments in the previous roster are absent.
+    carry_night_shifts : dict mapping employee_id to a specific shift code for staff
+                         who were on an overnight shift on the last day of the previous
+                         roster. Used by C5 to correctly count carryover night staff
+                         toward day 0 early morning demand coverage.
  
     Examples
     --------
     RosterContext(
-        carry_consec = {SN_1: 2, SN_2: 0, SN_3: 1},
-        carry_shifts = {"SN_3": ("NSG", -1), "SN_4": ("ESG", -2)},
+        carry_consec       = {SN_1: 2, SN_2: 0, SN_3: 1},
+        carry_shifts       = {"SN_3": ("NSG", -1), "SN_4": ("ESG", -2)},
+        carry_night_shifts = {"SN_3": "N2210"},
     )
     """
-    carry_consec: dict[str, int]             = field(default_factory=dict)
-    carry_shifts: dict[str, tuple[str, int]] = field(default_factory=dict)
+    carry_consec:       dict[str, int]             = field(default_factory=dict)
+    carry_shifts:       dict[str, tuple[str, int]] = field(default_factory=dict)
+    carry_night_shifts: dict[str, str]             = field(default_factory=dict)
 
 # ---------------------------------------------------------------------------
 # ConditionalConstraint
@@ -253,10 +259,13 @@ class RosterEngine:
         Returns
         -------
         RosterContext containing:
-        - carry_consec : consecutive working day count per staff at end of roster.
-        - carry_shifts : most recent shift group and relative day offset per staff,
-                         used by C_context to apply ConditionalConstraints across
-                         the roster boundary.
+        - carry_consec       : consecutive working day count per staff at end of roster.
+        - carry_shifts       : most recent shift group and relative day offset per staff,
+                               used by C_context to apply ConditionalConstraints across
+                               the roster boundary.
+        - carry_night_shifts : specific shift code for staff on an overnight shift on the
+                               last day of the roster, used by C5 to count carryover night
+                               staff toward day 0 early morning demand coverage.
         """
         assignments = result["assignments"]
         consec_days = result["consec_days"]
@@ -268,6 +277,7 @@ class RosterEngine:
  
         carry_consec = {}
         carry_shifts = {}
+        carry_night_shifts = {}
         
         for n, staff in enumerate(staff_list):
             carry_consec[staff.employee_id] = consec_days[n, last_day]
@@ -282,6 +292,8 @@ class RosterEngine:
                                 shift.shift_group.code,
                                 d - last_day - 1,  # negative offset relative to new roster start
                             )
+                            if shift.shift_group.is_night_shift and d == last_day:
+                                carry_night_shifts[staff.employee_id] = shift.code
                         break
                 else:
                     continue
@@ -291,6 +303,7 @@ class RosterEngine:
         return RosterContext(
             carry_consec=carry_consec,
             carry_shifts=carry_shifts,
+            carry_night_shifts=carry_night_shifts,
         )
     
     
@@ -392,6 +405,19 @@ class RosterEngine:
                 ) == target_work_min
             )
 
+        # Precompute carry_night_coverage: shift_idx -> [staff indices]
+        # for overnight shifts carried over from the previous roster (day -1)
+        carry_night_coverage: dict[int, list[int]] = {}
+        if context and context.carry_night_shifts:
+            staff_index = {staff.employee_id: n for n, staff in enumerate(staff_list)}
+            for shift_idx in work_shifts:
+                shift_code = shifts[shift_idx].code
+                for employee_id, carry_shift_code in context.carry_night_shifts.items():
+                    if carry_shift_code == shift_code:
+                        n = staff_index.get(employee_id)
+                        if n is not None:
+                            carry_night_coverage.setdefault(shift_idx, []).append(n)
+        
         # Precompute C5: for each demand, the check points and which shifts
         # cover each check point.
         # demand_coverage[(d_idx, check_point)] = list of shift indices covering it
@@ -400,16 +426,23 @@ class RosterEngine:
             for demand in _demands_for_day(demands, roster_start, d):
                 for point in _check_points(demand, shifts):
                     covering = []
+                    carry_count = 0
                     for shift_idx in work_shifts:
                         covers, day_offset = _shift_covers_checkpoint(shifts[shift_idx], point)
                         if covers:
                             shift_day = d + day_offset
                             if 0 <= shift_day < num_days:
                                 covering.append((shift_idx, day_offset))
-                    demand_coverage.append((d, demand, covering))
+                            elif shift_day == -1 and shift_idx in carry_night_coverage:
+                                carry_count += sum(
+                                    1 for n in carry_night_coverage[shift_idx]
+                                    if not demand.skillset_required
+                                    or staff_list[n].meets_requirements(demand.skillset_required)
+                                )
+                    demand_coverage.append((d, demand, covering, carry_count))
                     
         # C5 — Demand coverage at each boundary check point
-        for d, demand, covering in demand_coverage:
+        for d, demand, covering, carry_count in demand_coverage:
             if not covering:
                 continue
             
@@ -419,7 +452,7 @@ class RosterEngine:
                         x[n, d + day_offset, shift_idx]
                         for n in range(num_staff)
                         for shift_idx, day_offset in covering
-                    ) >= demand.headcount
+                    ) >= demand.headcount - carry_count
                 )
             else:
                 eligible = [
@@ -431,7 +464,7 @@ class RosterEngine:
                         x[n, d + day_offset, shift_idx]
                         for n in eligible
                         for shift_idx, day_offset in covering
-                    ) >= demand.headcount
+                    ) >= demand.headcount - carry_count
                 )
 
         # C6 — Permitted work shifts

@@ -1,6 +1,6 @@
 from datetime import date as date_type
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,6 +15,8 @@ def list_demands(
     from_date: date_type | None = None,
     to_date: date_type | None = None,
     skill_value_id: int | None = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     q = db.query(Demand)
@@ -24,7 +26,7 @@ def list_demands(
         q = q.filter(Demand.date <= to_date)
     if skill_value_id:
         q = q.filter_by(skill_value_id=skill_value_id)
-    return q.order_by(Demand.date, Demand.start_min).all()
+    return q.order_by(Demand.date, Demand.start_min).offset(offset).limit(limit).all()
 
 
 @router.post("", response_model=DemandOut, status_code=status.HTTP_201_CREATED)
