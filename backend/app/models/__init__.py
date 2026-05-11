@@ -4,6 +4,7 @@ from app.models.shift import ShiftGroup, Shift
 from app.models.staff import StaffGroup, Staff, StaffSkill, StaffPermittedShift, Leave
 from app.models.profile import Profile, ProfileStaff, ProfileShift
 from app.models.roster import Roster, Demand, RosterDemand, RosterStatus
+from app.models.user import User
 
 __all__ = [
     "Base",
@@ -12,4 +13,5 @@ __all__ = [
     "StaffGroup", "Staff", "StaffSkill", "StaffPermittedShift", "Leave",
     "Profile", "ProfileStaff", "ProfileShift",
     "Roster", "Demand", "RosterDemand", "RosterStatus",
+    "User",
 ]

@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     redis_url: str
     celery_broker_url: str
     celery_result_backend: str
+ 
+    # Auth
+    secret_key: str
+    access_token_expire_minutes: int = 1440
 
     class Config:
         env_file = ".env"

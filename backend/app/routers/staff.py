@@ -1,10 +1,11 @@
 from datetime import date as date_type
 
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import StaffGroup, Staff, StaffSkill, StaffPermittedShift, Leave, SkillValue, Shift
+from app.models import StaffGroup, Staff, StaffSkill, StaffPermittedShift, Leave, SkillValue, Shift, User
+from app.dependencies.auth import get_current_user
 from app.schemas.staff import (
     StaffGroupCreate, StaffGroupUpdate, StaffGroupOut,
     StaffCreate, StaffUpdate, StaffOut,
@@ -18,12 +19,16 @@ router = APIRouter(prefix="/staff", tags=["Staff"])
 # ── Staff Groups ─────────────────────────────────────────────────────
 
 @router.get("/groups", response_model=list[StaffGroupOut])
-def list_staff_groups(db: Session = Depends(get_db)):
+def list_staff_groups(db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return db.query(StaffGroup).order_by(StaffGroup.name).all()
 
 
 @router.post("/groups", response_model=StaffGroupOut, status_code=status.HTTP_201_CREATED)
-def create_staff_group(body: StaffGroupCreate, db: Session = Depends(get_db)):
+def create_staff_group(body: StaffGroupCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if db.query(StaffGroup).filter_by(name=body.name).first():
         raise HTTPException(status.HTTP_409_CONFLICT, f"Staff group '{body.name}' already exists.")
     sg = StaffGroup(**body.model_dump())
@@ -34,7 +39,9 @@ def create_staff_group(body: StaffGroupCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/groups/{group_id}", response_model=StaffGroupOut)
-def update_staff_group(group_id: int, body: StaffGroupUpdate, db: Session = Depends(get_db)):
+def update_staff_group(group_id: int, body: StaffGroupUpdate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     sg = db.get(StaffGroup, group_id)
     if not sg:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff group not found.")
@@ -46,7 +53,9 @@ def update_staff_group(group_id: int, body: StaffGroupUpdate, db: Session = Depe
 
 
 @router.delete("/groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_staff_group(group_id: int, db: Session = Depends(get_db)):
+def delete_staff_group(group_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     sg = db.get(StaffGroup, group_id)
     if not sg:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff group not found.")
@@ -65,9 +74,8 @@ def list_leaves(
     staff_id: int | None = None,
     from_date: date_type | None = None,
     to_date: date_type | None = None,
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     q = db.query(Leave)
     if staff_id:
@@ -76,11 +84,13 @@ def list_leaves(
         q = q.filter(Leave.date >= from_date)
     if to_date:
         q = q.filter(Leave.date <= to_date)
-    return q.order_by(Leave.date).offset(offset).limit(limit).all()
+    return q.order_by(Leave.date).all()
 
 
 @router.post("/leaves", response_model=LeaveOut, status_code=status.HTTP_201_CREATED)
-def create_leave(body: LeaveCreate, db: Session = Depends(get_db)):
+def create_leave(body: LeaveCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not db.get(Staff, body.staff_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
     leave = Leave(**body.model_dump())
@@ -91,7 +101,9 @@ def create_leave(body: LeaveCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/leaves/{leave_id}", response_model=LeaveOut)
-def update_leave(leave_id: int, body: LeaveUpdate, db: Session = Depends(get_db)):
+def update_leave(leave_id: int, body: LeaveUpdate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     leave = db.get(Leave, leave_id)
     if not leave:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Leave not found.")
@@ -103,7 +115,9 @@ def update_leave(leave_id: int, body: LeaveUpdate, db: Session = Depends(get_db)
 
 
 @router.delete("/leaves/{leave_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_leave(leave_id: int, db: Session = Depends(get_db)):
+def delete_leave(leave_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     leave = db.get(Leave, leave_id)
     if not leave:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Leave not found.")
@@ -118,6 +132,7 @@ def list_staff(
     group_id: int | None = None,
     include_deleted: bool = Query(False),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     q = db.query(Staff)
     if not include_deleted:
@@ -128,7 +143,9 @@ def list_staff(
 
 
 @router.post("", response_model=StaffOut, status_code=status.HTTP_201_CREATED)
-def create_staff(body: StaffCreate, db: Session = Depends(get_db)):
+def create_staff(body: StaffCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not db.get(StaffGroup, body.staff_group_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff group not found.")
     if db.query(Staff).filter_by(employee_id=body.employee_id).first():
@@ -141,7 +158,9 @@ def create_staff(body: StaffCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{staff_id}", response_model=StaffOut)
-def get_staff(staff_id: int, db: Session = Depends(get_db)):
+def get_staff(staff_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     s = db.get(Staff, staff_id)
     if not s:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
@@ -149,7 +168,9 @@ def get_staff(staff_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{staff_id}", response_model=StaffOut)
-def update_staff(staff_id: int, body: StaffUpdate, db: Session = Depends(get_db)):
+def update_staff(staff_id: int, body: StaffUpdate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     s = db.get(Staff, staff_id)
     if not s:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
@@ -161,7 +182,9 @@ def update_staff(staff_id: int, body: StaffUpdate, db: Session = Depends(get_db)
 
 
 @router.post("/{staff_id}/delete", response_model=StaffOut)
-def soft_delete_staff(staff_id: int, db: Session = Depends(get_db)):
+def soft_delete_staff(staff_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Soft-delete: sets deleted=True. Staff remains in historical rosters."""
     s = db.get(Staff, staff_id)
     if not s:
@@ -173,7 +196,9 @@ def soft_delete_staff(staff_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{staff_id}/restore", response_model=StaffOut)
-def restore_staff(staff_id: int, db: Session = Depends(get_db)):
+def restore_staff(staff_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     s = db.get(Staff, staff_id)
     if not s:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
@@ -186,7 +211,9 @@ def restore_staff(staff_id: int, db: Session = Depends(get_db)):
 # ── Staff Skills ─────────────────────────────────────────────────────
 
 @router.get("/{staff_id}/skills")
-def get_staff_skills(staff_id: int, db: Session = Depends(get_db)):
+def get_staff_skills(staff_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     s = db.get(Staff, staff_id)
     if not s:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
@@ -201,7 +228,9 @@ def get_staff_skills(staff_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{staff_id}/skills", status_code=status.HTTP_201_CREATED)
-def add_staff_skill(staff_id: int, body: StaffSkillAdd, db: Session = Depends(get_db)):
+def add_staff_skill(staff_id: int, body: StaffSkillAdd, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not db.get(Staff, staff_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
     if not db.get(SkillValue, body.skill_value_id):
@@ -215,7 +244,9 @@ def add_staff_skill(staff_id: int, body: StaffSkillAdd, db: Session = Depends(ge
 
 
 @router.delete("/{staff_id}/skills/{skill_value_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_staff_skill(staff_id: int, skill_value_id: int, db: Session = Depends(get_db)):
+def remove_staff_skill(staff_id: int, skill_value_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     sk = db.query(StaffSkill).filter_by(staff_id=staff_id, skill_value_id=skill_value_id).first()
     if not sk:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Skill assignment not found.")
@@ -226,7 +257,9 @@ def remove_staff_skill(staff_id: int, skill_value_id: int, db: Session = Depends
 # ── Permitted Shifts ─────────────────────────────────────────────────
 
 @router.get("/{staff_id}/permitted-shifts")
-def get_permitted_shifts(staff_id: int, db: Session = Depends(get_db)):
+def get_permitted_shifts(staff_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     s = db.get(Staff, staff_id)
     if not s:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
@@ -247,7 +280,9 @@ def get_permitted_shifts(staff_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{staff_id}/permitted-shifts", status_code=status.HTTP_201_CREATED)
-def add_permitted_shift(staff_id: int, body: StaffPermittedShiftAdd, db: Session = Depends(get_db)):
+def add_permitted_shift(staff_id: int, body: StaffPermittedShiftAdd, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not db.get(Staff, staff_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not found.")
     if not db.get(Shift, body.shift_id):
@@ -261,7 +296,9 @@ def add_permitted_shift(staff_id: int, body: StaffPermittedShiftAdd, db: Session
 
 
 @router.delete("/{staff_id}/permitted-shifts/{shift_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_permitted_shift(staff_id: int, shift_id: int, db: Session = Depends(get_db)):
+def remove_permitted_shift(staff_id: int, shift_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     ps = db.query(StaffPermittedShift).filter_by(staff_id=staff_id, shift_id=shift_id).first()
     if not ps:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Permitted shift not found.")

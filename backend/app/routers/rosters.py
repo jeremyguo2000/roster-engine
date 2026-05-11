@@ -1,33 +1,35 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from app.database import get_db
-from app.models import Roster, RosterStatus, RosterDemand, Demand, Profile, Leave
-from app.schemas.roster import RosterListItem, RosterCreate, RosterOut, DemandOut
+from app.models import Roster, RosterStatus, RosterDemand, Demand, Profile, Leave, User
+from app.dependencies.auth import get_current_user
+from app.schemas.roster import RosterCreate, RosterOut, DemandOut
 from app.worker.tasks import run_solver
 
 router = APIRouter(prefix="/rosters", tags=["Rosters"])
 
 
-@router.get("", response_model=list[RosterListItem])
+@router.get("", response_model=list[RosterOut])
 def list_rosters(
     status: RosterStatus | None = None,
     profile_id: int | None = None,
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     q = db.query(Roster)
     if status:
         q = q.filter(Roster.status == status)
     if profile_id:
         q = q.filter_by(profile_id=profile_id)
-    return q.order_by(Roster.roster_start.desc()).offset(offset).limit(limit).all()
+    return q.order_by(Roster.roster_start.desc()).all()
 
 
 @router.post("", response_model=RosterOut, status_code=status.HTTP_201_CREATED)
-def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db)):
+def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Create a roster, link existing demand rows, then dispatch the solver."""
     if not db.get(Profile, body.profile_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
@@ -39,7 +41,7 @@ def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db)):
                 status.HTTP_404_NOT_FOUND,
                 f"Demand id {demand_id} not found."
             )
- 
+
     # Validate previous_roster_id if provided
     if body.previous_roster_id:
         prev = db.get(Roster, body.previous_roster_id)
@@ -86,7 +88,9 @@ def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{roster_id}", response_model=RosterOut)
-def get_roster(roster_id: int, db: Session = Depends(get_db)):
+def get_roster(roster_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     roster = db.get(Roster, roster_id)
     if not roster:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Roster not found.")
@@ -94,7 +98,9 @@ def get_roster(roster_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{roster_id}/demands", response_model=list[DemandOut])
-def get_roster_demands(roster_id: int, db: Session = Depends(get_db)):
+def get_roster_demands(roster_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get all demands linked to a roster via RosterDemand junction."""
     roster = db.get(Roster, roster_id)
     if not roster:
@@ -103,7 +109,9 @@ def get_roster_demands(roster_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{roster_id}/leaves")
-def get_roster_leaves(roster_id: int, db: Session = Depends(get_db)):
+def get_roster_leaves(roster_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Preview which leaves will be applied as pre-assignments when the solver runs."""
     roster = db.get(Roster, roster_id)
     if not roster:
@@ -144,7 +152,9 @@ def get_roster_leaves(roster_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{roster_id}/approve", response_model=RosterOut)
-def approve_roster(roster_id: int, db: Session = Depends(get_db)):
+def approve_roster(roster_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     roster = db.get(Roster, roster_id)
     if not roster:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Roster not found.")
@@ -160,7 +170,9 @@ def approve_roster(roster_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{roster_id}/discard", status_code=status.HTTP_204_NO_CONTENT)
-def discard_roster(roster_id: int, db: Session = Depends(get_db)):
+def discard_roster(roster_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     roster = db.get(Roster, roster_id)
     if not roster:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Roster not found.")
@@ -171,7 +183,9 @@ def discard_roster(roster_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{roster_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_roster(roster_id: int, db: Session = Depends(get_db)):
+def delete_roster(roster_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     roster = db.get(Roster, roster_id)
     if not roster:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Roster not found.")

@@ -7,6 +7,7 @@
 ```bash
 cp .env.example .env
 # Edit .env — set a strong POSTGRES_PASSWORD
+# Also set SECRET_KEY (generate with: openssl rand -hex 32)
 ```
 
 ### 2. Build the images with your user IDs
@@ -51,9 +52,21 @@ docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
 You only run Step 1 again when your models change. 
 Step 2 is run whenever you want to apply pending migrations.
 
-### 5. Open API docs
+### 5. Bootstrap the first user
 
-- Swagger UI: http://localhost:8000/docs
+All API endpoints (except `POST /api/auth/login`) require authentication. Create the first user via CLI:
+
+```bash
+docker compose -f docker-compose.dev.yml exec backend python -m app.scripts.create_user  
+```
+
+Username must be at least 3 characters, password at least 6.
+
+Subsequent users can be created via `POST /api/auth/users` (requires auth).
+
+### 6. Open API docs
+
+- Swagger UI:  http://localhost:8000/docs
 - ReDoc:       http://localhost:8000/redoc
 - Health:      http://localhost:8000/api/health
 
@@ -104,10 +117,26 @@ docker compose -f docker-compose.dev.yml down
 docker compose -f docker-compose.dev.yml down -v
 ```
 
+## Authentication
+ 
+All `/api/*` endpoints except `POST /api/auth/login` require a valid JWT bearer token.
+Include the token in the `Authorization` header:
+ 
+```
+Authorization: Bearer <token>
+```
+ 
+Obtain a token by calling `POST /api/auth/login` with valid credentials.
+ 
 ## API Route Summary
 
 | Method | Path | Description |
 |--------|------|-------------|
+| POST | `/api/auth/login` | Log in, returns JWT token |
+| GET | `/api/auth/me` | Get current user info |
+| POST | `/api/auth/change-password` | Change own password |
+| GET/POST | `/api/auth/users` | List / create users |
+| DELETE | `/api/auth/users/{id}` | Delete a user (cannot delete self) |
 | GET/POST | `/api/skills/types` | List / create skill types |
 | PATCH/DELETE | `/api/skills/types/{id}` | Update / delete skill type |
 | POST | `/api/skills/types/{id}/values` | Add skill value |

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
  
-from app.routers import skills, shifts, staff, profiles, rosters, demands
+from app.routers import skills, shifts, staff, profiles, rosters, demands, auth
  
 app = FastAPI(
     title="Roster Engine API",
@@ -17,6 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
  
+app.include_router(auth.router,     prefix="/api")
 app.include_router(skills.router,   prefix="/api")
 app.include_router(shifts.router,   prefix="/api")
 app.include_router(staff.router,    prefix="/api")

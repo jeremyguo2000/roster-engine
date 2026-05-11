@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Profile, ProfileStaff, ProfileShift, Staff, Shift, StaffGroup, ShiftGroup
+from app.models import Profile, ProfileStaff, ProfileShift, Staff, Shift, StaffGroup, ShiftGroup, User
+from app.dependencies.auth import get_current_user
 from app.schemas.profile import (
     ProfileCreate, ProfileUpdate, ProfileOut,
     ProfileStaffAdd, ProfileStaffOut, ProfileStaffUpdate,
@@ -13,12 +14,16 @@ router = APIRouter(prefix="/profiles", tags=["Profiles"])
 
 
 @router.get("", response_model=list[ProfileOut])
-def list_profiles(db: Session = Depends(get_db)):
+def list_profiles(db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return db.query(Profile).order_by(Profile.name).all()
 
 
 @router.post("", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
-def create_profile(body: ProfileCreate, db: Session = Depends(get_db)):
+def create_profile(body: ProfileCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if db.query(Profile).filter_by(name=body.name).first():
         raise HTTPException(status.HTTP_409_CONFLICT, f"Profile '{body.name}' already exists.")
     p = Profile(**body.model_dump())
@@ -29,7 +34,9 @@ def create_profile(body: ProfileCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{profile_id}", response_model=ProfileOut)
-def get_profile(profile_id: int, db: Session = Depends(get_db)):
+def get_profile(profile_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     p = db.get(Profile, profile_id)
     if not p:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
@@ -37,7 +44,9 @@ def get_profile(profile_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{profile_id}", response_model=ProfileOut)
-def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(get_db)):
+def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     p = db.get(Profile, profile_id)
     if not p:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
@@ -49,7 +58,9 @@ def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(g
 
 
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_profile(profile_id: int, db: Session = Depends(get_db)):
+def delete_profile(profile_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     from sqlalchemy.exc import IntegrityError
     p = db.get(Profile, profile_id)
     if not p:
@@ -73,14 +84,18 @@ def delete_profile(profile_id: int, db: Session = Depends(get_db)):
 # ── Profile Staff ────────────────────────────────────────────────────
 
 @router.get("/{profile_id}/staff", response_model=list[ProfileStaffOut])
-def list_profile_staff(profile_id: int, db: Session = Depends(get_db)):
+def list_profile_staff(profile_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not db.get(Profile, profile_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
     return db.query(ProfileStaff).filter_by(profile_id=profile_id).all()
 
 
 @router.post("/{profile_id}/staff", response_model=ProfileStaffOut, status_code=status.HTTP_201_CREATED)
-def add_profile_staff(profile_id: int, body: ProfileStaffAdd, db: Session = Depends(get_db)):
+def add_profile_staff(profile_id: int, body: ProfileStaffAdd, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not db.get(Profile, profile_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
     if not db.get(Staff, body.staff_id):
@@ -96,7 +111,9 @@ def add_profile_staff(profile_id: int, body: ProfileStaffAdd, db: Session = Depe
 
 
 @router.post("/{profile_id}/staff/add-group/{group_id}", status_code=status.HTTP_201_CREATED)
-def add_staff_group_to_profile(profile_id: int, group_id: int, db: Session = Depends(get_db)):
+def add_staff_group_to_profile(profile_id: int, group_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Bulk-add all active staff from a staff group into the profile."""
     if not db.get(Profile, profile_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
@@ -117,7 +134,8 @@ def add_staff_group_to_profile(profile_id: int, group_id: int, db: Session = Dep
 
 @router.patch("/{profile_id}/staff/{staff_id}", response_model=ProfileStaffOut)
 def update_profile_staff(
-    profile_id: int, staff_id: int, body: ProfileStaffUpdate, db: Session = Depends(get_db)
+    profile_id: int, staff_id: int, body: ProfileStaffUpdate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Toggle the excluded flag for a staff member in a profile."""
     ps = db.query(ProfileStaff).filter_by(profile_id=profile_id, staff_id=staff_id).first()
@@ -130,7 +148,9 @@ def update_profile_staff(
 
 
 @router.delete("/{profile_id}/staff/{staff_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_profile_staff(profile_id: int, staff_id: int, db: Session = Depends(get_db)):
+def remove_profile_staff(profile_id: int, staff_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     ps = db.query(ProfileStaff).filter_by(profile_id=profile_id, staff_id=staff_id).first()
     if not ps:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff not in profile.")
@@ -141,14 +161,18 @@ def remove_profile_staff(profile_id: int, staff_id: int, db: Session = Depends(g
 # ── Profile Shifts ───────────────────────────────────────────────────
 
 @router.get("/{profile_id}/shifts", response_model=list[ProfileShiftOut])
-def list_profile_shifts(profile_id: int, db: Session = Depends(get_db)):
+def list_profile_shifts(profile_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not db.get(Profile, profile_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
     return db.query(ProfileShift).filter_by(profile_id=profile_id).all()
 
 
 @router.post("/{profile_id}/shifts", response_model=ProfileShiftOut, status_code=status.HTTP_201_CREATED)
-def add_profile_shift(profile_id: int, body: ProfileShiftAdd, db: Session = Depends(get_db)):
+def add_profile_shift(profile_id: int, body: ProfileShiftAdd, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not db.get(Profile, profile_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
     if not db.get(Shift, body.shift_id):
@@ -164,7 +188,9 @@ def add_profile_shift(profile_id: int, body: ProfileShiftAdd, db: Session = Depe
 
 
 @router.post("/{profile_id}/shifts/add-group/{group_id}", status_code=status.HTTP_201_CREATED)
-def add_shift_group_to_profile(profile_id: int, group_id: int, db: Session = Depends(get_db)):
+def add_shift_group_to_profile(profile_id: int, group_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Bulk-add all shifts from a shift group into the profile."""
     if not db.get(Profile, profile_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
@@ -182,7 +208,9 @@ def add_shift_group_to_profile(profile_id: int, group_id: int, db: Session = Dep
 
 
 @router.delete("/{profile_id}/shifts/{shift_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_profile_shift(profile_id: int, shift_id: int, db: Session = Depends(get_db)):
+def remove_profile_shift(profile_id: int, shift_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     ps = db.query(ProfileShift).filter_by(profile_id=profile_id, shift_id=shift_id).first()
     if not ps:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Shift not in profile.")
