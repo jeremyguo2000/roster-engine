@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -24,6 +25,22 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(username=body.username).first()
     if not user or not verify_password(body.password, user.password_hash):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid username or password.",
+        )
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token)
+
+
+@router.post("/token", response_model=TokenResponse, include_in_schema=False)
+def token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    """OAuth2-compatible endpoint for Swagger's Authorize button. Same as /login but accepts form data."""
+    user = db.query(User).filter_by(username=form_data.username).first()
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
             "Invalid username or password.",
