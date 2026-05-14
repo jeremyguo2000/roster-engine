@@ -1,8 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { Toaster } from "@/components/layout/Toaster";
+import { notify } from "@/lib/toast";
 import App from "./App";
 import "./index.css";
 
@@ -14,6 +16,14 @@ const queryClient = new QueryClient({
       retry: 1,
     },
   },
+  // Global mutation errors auto-toast unless the call site handles them
+  // explicitly with `meta: { silent: true }`.
+  mutationCache: new MutationCache({
+    onError: (error, _vars, _ctx, mutation) => {
+      if (mutation.meta?.silent) return;
+      notify.error(error);
+    },
+  }),
 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -22,6 +32,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <App />
+          <Toaster />
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>

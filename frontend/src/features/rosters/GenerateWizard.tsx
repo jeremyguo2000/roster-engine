@@ -28,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn, minToTime, minToDuration } from "@/lib/utils";
 import { getApiErrorMessage } from "@/api/client";
+import { notify } from "@/lib/toast";
 import { useCreateRoster, useProfiles, useRosters } from "./hooks";
 import { useDemands } from "@/features/demands/hooks";
 import type { components } from "@/api/schema.gen";
@@ -117,7 +118,10 @@ export function GenerateWizard() {
         previous_roster_id: state.previousRosterId,
       },
       {
-        onSuccess: (data) => navigate(`/rosters/${data.id}`),
+        onSuccess: (data) => {
+          notify.success("Solver dispatched", `Watching roster #${data.id}…`);
+          navigate(`/rosters/${data.id}`);
+        },
       },
     );
   }

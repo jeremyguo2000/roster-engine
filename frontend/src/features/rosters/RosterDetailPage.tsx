@@ -38,6 +38,7 @@ import {
 import { parseRosterResult } from "./rosterResult";
 import { getApiErrorMessage } from "@/api/client";
 import { minToDuration } from "@/lib/utils";
+import { notify } from "@/lib/toast";
 
 export function RosterDetailPage() {
   const { id: idParam } = useParams();
@@ -128,9 +129,7 @@ export function RosterDetailPage() {
                 disabled={approve.isPending}
                 onClick={() =>
                   approve.mutate(roster.id, {
-                    onError: () => {
-                      /* surfaced via mutation error banner below */
-                    },
+                    onSuccess: () => notify.success("Roster approved"),
                   })
                 }
               >
@@ -147,7 +146,10 @@ export function RosterDetailPage() {
                 pending={discard.isPending}
                 onConfirm={() =>
                   discard.mutate(roster.id, {
-                    onSuccess: () => navigate("/rosters"),
+                    onSuccess: () => {
+                      notify.success("Roster discarded");
+                      navigate("/rosters");
+                    },
                   })
                 }
               />
@@ -160,7 +162,10 @@ export function RosterDetailPage() {
               pending={remove.isPending}
               onConfirm={() =>
                 remove.mutate(roster.id, {
-                  onSuccess: () => navigate("/rosters"),
+                  onSuccess: () => {
+                    notify.success("Roster deleted");
+                    navigate("/rosters");
+                  },
                 })
               }
             />
@@ -168,18 +173,7 @@ export function RosterDetailPage() {
         }
       />
 
-      {/* Mutation error surface */}
-      {(approve.isError || discard.isError || remove.isError) && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Action failed</AlertTitle>
-          <AlertDescription>
-            {getApiErrorMessage(approve.error ?? discard.error ?? remove.error)}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Status banners */}
+      {/* Status banners (action errors surface via global toasts) */}
       {roster.status === "running" && (
         <Alert variant="info" className="mb-4">
           <Loader2 className="h-4 w-4 animate-spin" />

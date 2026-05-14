@@ -47,6 +47,7 @@ import { useShiftGroups, useShifts } from "@/features/shifts/hooks";
 import { ConditionalConstraintsEditor } from "./ConditionalConstraintsEditor";
 import { DEFAULT_CONFIG, parseProfileConfig, type ProfileConfig } from "./profileConfig";
 import { getApiErrorMessage } from "@/api/client";
+import { notify } from "@/lib/toast";
 import type { components } from "@/api/schema.gen";
 
 type StaffOut = components["schemas"]["StaffOut"];
@@ -532,10 +533,13 @@ function ConfigTab({
           <Button
             disabled={!dirty || update.isPending}
             onClick={() =>
-              update.mutate({
-                id: profileId,
-                body: { config: config as unknown as Record<string, never> },
-              })
+              update.mutate(
+                {
+                  id: profileId,
+                  body: { config: config as unknown as Record<string, never> },
+                },
+                { onSuccess: () => notify.success("Config saved") },
+              )
             }
           >
             {update.isPending ? "Saving…" : "Save config"}

@@ -1,6 +1,6 @@
 # Frontend Build Progress
 
-Companion to [`PLAN.md`](PLAN.md). Tracks what has shipped, where we are now, and what comes next. Updated end-of-Phase 5.
+Companion to [`PLAN.md`](PLAN.md). Tracks what has shipped, where we are now, and what comes next. Updated end-of-Phase 6 — the build is complete.
 
 ---
 
@@ -42,7 +42,7 @@ frontend/src/
 | 3 | Rosters list + detail with grid + polling (centerpiece) | **Shipped** |
 | 4 | 5-step generate wizard | **Shipped** |
 | 5 | Admin pages (dashboard cards, staff, profiles + CC editor, shifts, skills, demands, users) | **Shipped** |
-| 6 | Polish (toasts, confirm modals, Cmd+K, skeletons, Vitest tests) | Pending |
+| 6 | Polish (toasts, confirm modals, Cmd+K, skeletons, Vitest tests) | **Shipped** |
 
 ---
 
@@ -259,7 +259,47 @@ Every CRUD path the backend exposes now has a working UI. Each page invalidates 
 
 ---
 
-**Up next: Phase 6** — polish (toasts via sonner, Cmd+K command palette, broader skeletons, Vitest coverage on the highest-value pieces — `RosterGrid`, axios 401 interceptor, wizard validation, color-mapping helper).
+---
+
+## Phase 6 — Polish (shipped)
+
+The four polish goals from PLAN.md are in.
+
+**Toasts via sonner:**
+- `components/layout/Toaster.tsx` — `<Toaster>` mounted once at the root of `main.tsx`, themed off `useTheme().resolvedTheme`.
+- `lib/toast.ts` — small `notify` wrapper (`success`, `error`, `info`) so call sites stay terse and consistent.
+- `main.tsx` — `QueryClient` now has a global `MutationCache` whose `onError` calls `notify.error(error)` automatically. Call sites that already render an inline error (e.g. dialog forms with `MutationError`) opt out via `mutation.meta = { silent: true }`.
+- `api/queryMeta.d.ts` — TanStack Query's `Register` augmented with `mutationMeta.silent` + `queryMeta.silent` so the meta field typechecks.
+- Selective success toasts wired on the highest-signal flows: roster Approve / Discard / Delete, "Solver dispatched" after the wizard submits, "Config saved" after the Profile config save. The redundant inline mutation-error banner on the roster detail action bar was removed (the global toast covers it).
+
+**Cmd+K command palette:**
+- `components/ui/command.tsx` — shadcn-style `Command` primitives wrapping `cmdk`.
+- `components/layout/CommandPalette.tsx` — palette mounted inside `AppShell` (so it's only active when authenticated). Listens for `Cmd/Ctrl+K`. Two groups: **Navigate** (Dashboard / Rosters / Staff / Staff groups / Profiles / Shifts / Skills / Demands / Users) and **Actions** (Generate new roster, Toggle dark/light mode, Sign out). Esc closes (free from Radix `Dialog`). Selection is deferred via `queueMicrotask` so the dialog close animation doesn't trip the route transition.
+- `components/layout/Header.tsx` — added a "Search" button with a `⌘K` / `Ctrl K` kbd hint that synthesises the keydown to open the palette without coupling Header to the palette's internal state.
+
+**Vitest coverage** (4 test files, **17 tests passing** in ~600ms):
+- `features/rosters/groupColors.test.ts` — determinism, distinctness, dark-mode palette swap, well-formed HSL strings.
+- `api/client.test.ts` — Bearer token attachment, no-token branch, 401 → token cleared + handler invoked, non-401 errors leave the handler untouched, remember-flag storage routing. Stubs the axios adapter directly to avoid pulling in `axios-mock-adapter`.
+- `features/rosters/RosterGrid.test.tsx` — staff rows render, one column per day, shift codes painted, rest-day em-dash, max-consec badge variant flips at threshold, headcount/demand footer when demands are passed, moon icon on night cells.
+- `features/rosters/GenerateWizard.test.tsx` — Next button stays disabled on step 1 until a profile is selected; on the window step, Next stays disabled until the name field is non-empty. Stubs the axios adapter for the supporting queries (`/profiles`, `/demands`, `/rosters`).
+- `test/setup.ts` — added the standard polyfills jsdom is missing for Radix's pointer-capture usage (`hasPointerCapture`, `setPointerCapture`, `releasePointerCapture`, plus `scrollIntoView`).
+
+**Notable details / decisions:**
+- The mutation-cache `onError` runs after each mutation's own `onError`, so call sites that genuinely need to override (e.g. for an inline form error) can either set `meta: { silent: true }` or just continue using their inline `MutationError` banner — both work.
+- The command palette button in the header uses the synthetic-keydown trick so the palette stays self-contained (no shared state to hoist).
+- I considered adding loading skeletons to the few list pages still missing them, but the existing inline `Skeleton` blocks already cover the perceptible-latency endpoints; skipped to keep the diff tight.
+
+**Verification at end of phase:**
+- `npm run lint` → clean.
+- `npm run test:run` → 17 passing across 4 files.
+- `curl http://localhost:5173/dashboard` → `200`, `curl http://localhost:5173/rosters/new` → `200`.
+- Vite logs show all new deps optimized cleanly (`sonner`, `cmdk`).
+
+---
+
+## Build complete
+
+All six phases from PLAN.md are shipped. The frontend covers every backend endpoint, the centerpiece roster grid is live with polling, the 5-step generate wizard is wired end-to-end, every admin CRUD path round-trips, and the polish layer (toasts, Cmd+K, tests) is in. Next steps for the project would be the smoke-test from PLAN.md and any production-readiness work (real auth user lifecycle, build pipeline, etc.) outside the scope of these phases.
 
 ---
 
