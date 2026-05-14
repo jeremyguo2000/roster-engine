@@ -1,6 +1,6 @@
 # Frontend Build Progress
 
-Companion to [`PLAN.md`](PLAN.md). Tracks what has shipped, where we are now, and what comes next. Updated end-of-Phase 4.
+Companion to [`PLAN.md`](PLAN.md). Tracks what has shipped, where we are now, and what comes next. Updated end-of-Phase 5.
 
 ---
 
@@ -41,7 +41,7 @@ frontend/src/
 | 2 | Auth, ProtectedRoute, app shell with sidebar/header, placeholder pages, route table | **Shipped** — commit `ecba583` |
 | 3 | Rosters list + detail with grid + polling (centerpiece) | **Shipped** |
 | 4 | 5-step generate wizard | **Shipped** |
-| 5 | Admin pages (dashboard cards, staff, profiles + CC editor, shifts, skills, demands, users) | Pending |
+| 5 | Admin pages (dashboard cards, staff, profiles + CC editor, shifts, skills, demands, users) | **Shipped** |
 | 6 | Polish (toasts, confirm modals, Cmd+K, skeletons, Vitest tests) | Pending |
 
 ---
@@ -207,7 +207,59 @@ A 5-step stepper that drives `POST /api/rosters` and redirects into the detail p
 
 ---
 
-**Up next: Phase 5** — admin pages (Dashboard cards, Staff list/edit/skills/leaves, Profiles + Conditional-Constraints editor, Shifts, Skills, Demands, Users).
+---
+
+## Phase 5 — Admin pages (shipped)
+
+Every CRUD path the backend exposes now has a working UI. Each page invalidates the right TanStack Query keys so changes propagate without manual refresh.
+
+**New shadcn primitives:** `dialog`, `tabs`, `switch`, `textarea` (in addition to the 8 already present).
+
+**New shared components:**
+- `components/shared/EmptyState.tsx` — icon + title + description + action card for empty lists.
+- `components/shared/ConfirmDialog.tsx` — `AlertDialog` wrapper that takes a `trigger`, applies destructive styling on demand.
+- `components/shared/MutationError.tsx` — destructive `Alert` that renders `getApiErrorMessage(err)` when truthy; collapses to nothing otherwise.
+
+**Feature hooks (one `hooks.ts` per feature):**
+- `features/skills/hooks.ts` — types CRUD + value add/delete.
+- `features/shifts/hooks.ts` — shifts + groups CRUD.
+- `features/staff/hooks.ts` — staff CRUD + soft-delete/restore + groups + skills + permitted shifts + leaves.
+- `features/profiles/hooks.ts` — profile CRUD + staff/shift add+remove + bulk-add-group + excluded toggle.
+- `features/users/hooks.ts` — users list/create/delete + change password.
+- `features/demands/hooks.ts` — already had `useDemands`; added `useCreateDemand`.
+
+**Pages:**
+- **Dashboard** (`features/dashboard/DashboardPage.tsx`) — 4 summary cards (active staff, profiles, total rosters, currently solving) + recent rosters list. Each card links to its section.
+- **Skills** (`features/skills/SkillsPage.tsx`) — one card per skill type; values rendered as badges with inline delete. Create/edit dialogs for the type, inline form for adding values.
+- **Shifts** (`features/shifts/ShiftsPage.tsx`) — `Tabs` with **Shifts** + **Groups**. Shift dialog has all fields with live HH:MM helpers; group dialog uses `Switch` for `is_work_shift` and `is_night_shift`.
+- **Demands** (`features/demands/DemandsPage.tsx`) — date-range + skill-value filters; create dialog with start/end-min inputs (live HH:MM helpers).
+- **Staff list** (`features/staff/StaffListPage.tsx`) — group filter, name search, "Include deleted" toggle, soft-delete and restore actions.
+- **Staff groups** (`features/staff/StaffGroupsPage.tsx`) — minimal CRUD.
+- **Staff detail** (`features/staff/StaffDetailPage.tsx`) — top profile card with inline edit (Edit / Cancel / Save), then **Tabs** for Skills (badge picker), Permitted shifts (badge picker), Leaves (inline form + table).
+- **Profiles list** (`features/profiles/ProfilesListPage.tsx`) — minimal table with create + delete.
+- **Profile detail** (`features/profiles/ProfileDetailPage.tsx`) — **Tabs** for Staff / Shifts / Config.
+  - Staff tab: pick-and-add + bulk-add-group, table with `Switch` for excluded flag, remove with confirm.
+  - Shifts tab: same shape, no excluded flag.
+  - Config tab: 6 weight/time-limit number inputs + the **Conditional Constraints editor** (`ConditionalConstraintsEditor.tsx`). Edits stay local until "Save config" — dirty banner included.
+- **Users** (`features/users/UsersPage.tsx`) — list with "you" badge on the current user, delete (disabled on self), create dialog (≥3 char username, ≥6 char password), change-password dialog with confirm field and inline success.
+
+**Conditional constraints model** (`features/profiles/profileConfig.ts`): a Zod schema for `Profile.config` (weights + `conditional_constraints[]`). `parseProfileConfig()` is forgiving — unknown keys are dropped, missing ones default. The editor renders one row per constraint with selects for trigger/enforce groups (enforce supports the `*` wildcard) and number inputs for the offset and values.
+
+**Notable decisions / details:**
+- All mutations use TanStack Query with focused invalidations (e.g. `queryKeys.staff.skills(id)` only). No global `invalidateAll`.
+- Forms are plain `useState` — react-hook-form would be overkill for these shapes. Validation is simple "field non-empty / number ≥ 0" client-side.
+- Toasts are not yet wired (Phase 6 territory). Error surfaces use the shared `MutationError` banner, success is silent (the data updates).
+- The Profile config tab's `useEffect` reseeds local state when the upstream `initial` config changes (with `JSON.stringify` in deps + `eslint-disable-next-line` on the comparison) so a refetch overwrites uncommitted local edits — acceptable for this phase, will revisit if it bites.
+- One Vite-cache permission tweak again before the lint pass: `chown -R appuser:appuser /app/node_modules/.vite` so the optimizer could write the new radix deps (`react-dialog`, `react-tabs`, `react-switch`).
+
+**Verification at end of phase:**
+- `npm run lint` → clean.
+- All 10 routes (`/dashboard`, `/staff`, `/staff/groups`, `/profiles`, `/shifts`, `/skills`, `/demands`, `/users`, `/rosters`, `/rosters/new`) return HTTP 200.
+- Vite log: `✨ new dependencies optimized: @radix-ui/react-switch, @radix-ui/react-tabs, @radix-ui/react-dialog`.
+
+---
+
+**Up next: Phase 6** — polish (toasts via sonner, Cmd+K command palette, broader skeletons, Vitest coverage on the highest-value pieces — `RosterGrid`, axios 401 interceptor, wizard validation, color-mapping helper).
 
 ---
 

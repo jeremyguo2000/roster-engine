@@ -1,9 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { components } from "@/api/schema.gen";
 
 type DemandOut = components["schemas"]["DemandOut"];
+type DemandCreate = components["schemas"]["DemandCreate"];
 
 export interface DemandsFilter {
   from?: string;
@@ -26,6 +27,16 @@ export function useDemands(filters: DemandsFilter = {}) {
       const { data } = await api.get<DemandOut[]>("/demands", { params });
       return data;
     },
-    enabled: !!(filters.from && filters.to),
+  });
+}
+
+export function useCreateDemand() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: DemandCreate) => {
+      const { data } = await api.post<DemandOut>("/demands", body);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.demands.all }),
   });
 }
