@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm neutrals (stone-based) */
+    --background: 30 20% 99%;
+    --foreground: 25 15% 12%;
+    --card: 30 20% 99%;
+    --card-foreground: 25 15% 12%;
+    --popover: 30 20% 99%;
+    --popover-foreground: 25 15% 12%;
+
+    /* Primary: deep blue #1B4F8C */
+    --primary: 213 67% 33%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 30 12% 94%;
+    --secondary-foreground: 25 15% 16%;
+    --muted: 30 12% 94%;
+    --muted-foreground: 25 8% 42%;
+    --accent: 30 12% 94%;
+    --accent-foreground: 25 15% 16%;
+
+    /* Destructive: red #E63946 — reserved for delete/discard */
+    --destructive: 354 76% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 10% 88%;
+    --input: 30 10% 88%;
+    --ring: 213 67% 33%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 25 15% 8%;
+    --foreground: 30 15% 96%;
+    --card: 25 15% 10%;
+    --card-foreground: 30 15% 96%;
+    --popover: 25 15% 10%;
+    --popover-foreground: 30 15% 96%;
+
+    --primary: 213 80% 60%;
+    --primary-foreground: 25 15% 8%;
+
+    --secondary: 25 8% 18%;
+    --secondary-foreground: 30 15% 96%;
+    --muted: 25 8% 18%;
+    --muted-foreground: 25 8% 60%;
+    --accent: 25 8% 18%;
+    --accent-foreground: 30 15% 96%;
+
+    --destructive: 354 76% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 25 8% 22%;
+    --input: 25 8% 22%;
+    --ring: 213 80% 60%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-serif tracking-tight;
+  }
+}

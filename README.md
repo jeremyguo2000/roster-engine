@@ -64,16 +64,24 @@ Username must be at least 3 characters, password at least 6.
 
 Subsequent users can be created via `POST /api/auth/users` (requires auth).
 
-### 6. Open API docs
+### 6. Open API docs and frontend
 
 - Swagger UI:  http://localhost:8000/docs
 - ReDoc:       http://localhost:8000/redoc
 - Health:      http://localhost:8000/api/health
+- **Frontend:**  http://localhost:5173
+
+The frontend is a React 18 + Vite + TypeScript app served by Vite's dev server on port 5173 with hot reload. See [`frontend/README.md`](frontend/README.md) for stack details and folder structure. After backend schema changes, regenerate the OpenAPI types:
+
+```bash
+docker compose -f docker-compose.dev.yml exec frontend npm run gen:types
+```
 
 ## Services
 
 | Service       | Port  | Description                        |
 |---------------|-------|------------------------------------|
+| frontend      | 5173  | Vite dev server (React 18 + TS)    |
 | backend       | 8000  | FastAPI + Uvicorn (auto-reload)    |
 | celery_worker | —     | Solver background jobs             |
 | postgres      | 5432  | PostgreSQL 16                      |

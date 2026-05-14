@@ -67,5 +67,21 @@ services:
         condition: service_healthy
     command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=1
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=/api
+      - VITE_PROXY_TARGET=http://backend:8000
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0
+
 volumes:
   postgres_data:
