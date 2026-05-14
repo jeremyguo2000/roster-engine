@@ -1,6 +1,6 @@
 # Frontend Build Progress
 
-Companion to [`PLAN.md`](PLAN.md). Tracks what has shipped, where we are now, and what comes next. Updated end-of-Phase 3.
+Companion to [`PLAN.md`](PLAN.md). Tracks what has shipped, where we are now, and what comes next. Updated end-of-Phase 4.
 
 ---
 
@@ -40,7 +40,7 @@ frontend/src/
 | 1 | Foundation: scaffold, Tailwind/shadcn, theme, fonts, Docker, OpenAPI types | **Shipped** — commit `3bf54b3` |
 | 2 | Auth, ProtectedRoute, app shell with sidebar/header, placeholder pages, route table | **Shipped** — commit `ecba583` |
 | 3 | Rosters list + detail with grid + polling (centerpiece) | **Shipped** |
-| 4 | 5-step generate wizard | Pending |
+| 4 | 5-step generate wizard | **Shipped** |
 | 5 | Admin pages (dashboard cards, staff, profiles + CC editor, shifts, skills, demands, users) | Pending |
 | 6 | Polish (toasts, confirm modals, Cmd+K, skeletons, Vitest tests) | Pending |
 
@@ -172,7 +172,42 @@ Other small touches:
 - Backend, postgres, redis, celery_worker all running and healthy
 - DB has an `admin` user
 
-**Up next: Phase 4** — the 5-step generate wizard (`features/rosters/GenerateWizard.tsx`) wired to `useCreateRoster()` (already exported from `hooks.ts`).
+---
+
+## Phase 4 — Generate wizard (shipped)
+
+A 5-step stepper that drives `POST /api/rosters` and redirects into the detail page so polling kicks in immediately.
+
+**Delivered:**
+
+- `src/features/demands/hooks.ts` — `useDemands({ from, to, skillValueId })` hitting `GET /api/demands` (only fires when both `from` and `to` are present).
+- `src/components/ui/checkbox.tsx` — shadcn checkbox primitive (the only new UI primitive Phase 4 needed).
+- `src/features/rosters/GenerateWizard.tsx` — single-component wizard with internal step state and validation:
+  1. **Profile** — `Select` populated from `useProfiles()`. Empty/error states surface inline.
+  2. **Window** — name, start date (`<Input type="date" />`), days, target work minutes, with a live "≈ Nh over D days" helper.
+  3. **Demands** — table of demands in the derived window (`from = roster_start`, `to = roster_start + num_days - 1`), checkbox-per-row, search filter on date/headcount, "Select all / Clear all" toggle, count badge.
+  4. **Chain** — Select dropdown of recent rosters with usable results (`status ∈ {draft, approved}` AND `result != null`), filtered to the chosen profile; clears itself if you hop back to step 1 and pick a different profile.
+  5. **Review** — definition list summary plus an info banner. The Generate button calls `useCreateRoster()` and on success navigates to `/rosters/{id}` where the polling hook from Phase 3 takes over.
+- `src/features/rosters/GenerateRosterPage.tsx` — replaced the placeholder; renders `<GenerateWizard />` plus a back-to-rosters action.
+
+**Notable details / decisions:**
+- Validation is per-step via a `stepValid` map; the **Next** button is disabled until the current step is valid. Steps 3 (demands) and 4 (chain) are optional — backend treats `demand_ids: []` as no demand constraint and `previous_roster_id: null` as no chaining.
+- Wizard state lives in a single `useState<WizardState>`; demand IDs are a `Set<number>` for O(1) toggle. Resetting on success is unnecessary since we navigate away.
+- Chain candidates are filtered to the chosen profile because chaining across profiles rarely makes sense (different staff/shift universes); we cap at the 20 most recent.
+- Date input uses the native HTML `<Input type="date" />`. shadcn's Calendar / Popover combo would be overkill here and adds three more primitives just for this one field.
+- The `useCreateRoster` mutation already invalidates the rosters list query and seeds the detail cache, so the destination page renders immediately.
+
+**Notable issues encountered:**
+- Adding `@radix-ui/react-checkbox` triggered Vite's dep optimizer, which couldn't write to `/app/node_modules/.vite/` because that directory was created in Phase 1 when the container ran as root. Fixed once with `docker compose exec -u root frontend chown -R appuser:appuser /app/node_modules/.vite` and a frontend restart. Subsequent dep additions should "just work" now.
+
+**Verification at end of phase:**
+- `docker compose -f docker-compose.dev.yml exec frontend npm run lint` → clean
+- Vite logs show all radix deps re-optimized cleanly (`✨ new dependencies optimized: ... @radix-ui/react-checkbox ...`)
+- `curl http://localhost:5173/rosters/new` → `200`
+
+---
+
+**Up next: Phase 5** — admin pages (Dashboard cards, Staff list/edit/skills/leaves, Profiles + Conditional-Constraints editor, Shifts, Skills, Demands, Users).
 
 ---
 
