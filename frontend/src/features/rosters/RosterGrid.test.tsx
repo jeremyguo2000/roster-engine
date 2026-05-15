@@ -110,4 +110,30 @@ describe("RosterGrid", () => {
     const moonNodes = within(container as HTMLElement).getAllByLabelText(/night shift/i);
     expect(moonNodes.length).toBeGreaterThanOrEqual(1);
   });
+
+  it("falls back to shiftGroupsByCode when shift entries are missing the work/night flags", () => {
+    // Legacy roster: AL shift has no is_work_shift / is_night_shift in JSON.
+    const legacy = {
+      ...RESULT,
+      shifts: {
+        ...RESULT.shifts,
+        AL: {
+          name: "Annual leave",
+          group: "AL",
+          start_time: 0,
+          end_time: 0,
+          work_time: 0,
+        },
+      },
+    };
+    const groups = new Map([
+      ["DAY", { is_work_shift: true, is_night_shift: false }],
+      ["NIGHT", { is_work_shift: true, is_night_shift: true }],
+      ["AL", { is_work_shift: false, is_night_shift: false }],
+    ]);
+    render(<RosterGrid result={legacy} shiftGroupsByCode={groups} />);
+    const al = screen.getByText("AL");
+    // Leave styling lives on the cell wrapper (parent of the code text).
+    expect(al.className).toMatch(/amber/);
+  });
 });

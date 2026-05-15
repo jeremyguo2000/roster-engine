@@ -35,6 +35,7 @@ import {
   useRoster,
   useRosterDemands,
 } from "./hooks";
+import { useShiftGroups } from "@/features/shifts/hooks";
 import { parseRosterResult } from "./rosterResult";
 import { getApiErrorMessage } from "@/api/client";
 import { minToDuration } from "@/lib/utils";
@@ -48,9 +49,20 @@ export function RosterDetailPage() {
 
   const rosterQuery = useRoster(numericId);
   const demandsQuery = useRosterDemands(numericId);
+  const shiftGroupsQuery = useShiftGroups();
 
   const roster = rosterQuery.data;
   const parsed = useMemo(() => parseRosterResult(roster?.result ?? null), [roster?.result]);
+
+  // Fallback for legacy rosters that didn't persist is_work_shift /
+  // is_night_shift on each shift entry — look those up by group code.
+  const shiftGroupsByCode = useMemo(() => {
+    const map = new Map<string, { is_work_shift: boolean; is_night_shift: boolean }>();
+    for (const g of shiftGroupsQuery.data ?? []) {
+      map.set(g.code, { is_work_shift: g.is_work_shift, is_night_shift: g.is_night_shift });
+    }
+    return map;
+  }, [shiftGroupsQuery.data]);
 
   const approve = useApproveRoster();
   const discard = useDiscardRoster();
@@ -208,7 +220,11 @@ export function RosterDetailPage() {
 
       {/* Grid or placeholder */}
       {parsed?.kind === "ok" ? (
-        <RosterGrid result={parsed.data} demands={demandsQuery.data} />
+        <RosterGrid
+          result={parsed.data}
+          demands={demandsQuery.data}
+          shiftGroupsByCode={shiftGroupsByCode}
+        />
       ) : roster.status === "running" ? (
         <Card>
           <CardContent className="py-16 text-center text-sm text-muted-foreground">

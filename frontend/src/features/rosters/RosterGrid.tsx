@@ -23,11 +23,21 @@ interface Props {
   demands?: DemandOut[];
   /** Render a red badge in the per-row max-consec column when ≥ this. */
   maxConsecWarnAt?: number;
+  /**
+   * Fallback for legacy rosters whose persisted result is missing
+   * `is_work_shift` / `is_night_shift`. Keyed by shift-group code.
+   */
+  shiftGroupsByCode?: Map<string, { is_work_shift: boolean; is_night_shift: boolean }>;
 }
 
 const REST_DAY = "—";
 
-export function RosterGrid({ result, demands, maxConsecWarnAt = 6 }: Props) {
+export function RosterGrid({
+  result,
+  demands,
+  maxConsecWarnAt = 6,
+  shiftGroupsByCode,
+}: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
@@ -37,13 +47,24 @@ export function RosterGrid({ result, demands, maxConsecWarnAt = 6 }: Props) {
     [rosterStart, result.num_days],
   );
 
+  // Resolve the work/night flags for a shift, falling back to the live
+  // shift-group lookup when the persisted result didn't store them.
+  const flagsFor = (code: string) => {
+    const shift = result.shifts[code];
+    if (!shift) return undefined;
+    const groupFallback = shiftGroupsByCode?.get(shift.group);
+    return {
+      is_work_shift: shift.is_work_shift ?? groupFallback?.is_work_shift ?? true,
+      is_night_shift: shift.is_night_shift ?? groupFallback?.is_night_shift ?? false,
+    };
+  };
+
   // Per-day headcount totals + demand totals (for the footer row).
   const dayStats = useMemo(() => {
     const headcount = new Array(result.num_days).fill(0);
     for (const empAssignments of Object.values(result.assignments)) {
       for (const [day, code] of Object.entries(empAssignments)) {
-        const shift = result.shifts[code];
-        if (shift?.is_work_shift) headcount[Number(day)] += 1;
+        if (flagsFor(code)?.is_work_shift) headcount[Number(day)] += 1;
       }
     }
     const demandByDay = new Array(result.num_days).fill(0);
@@ -58,7 +79,8 @@ export function RosterGrid({ result, demands, maxConsecWarnAt = 6 }: Props) {
       }
     }
     return { headcount, demandByDay };
-  }, [result, demands, rosterStart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, demands, rosterStart, shiftGroupsByCode]);
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -108,12 +130,19 @@ export function RosterGrid({ result, demands, maxConsecWarnAt = 6 }: Props) {
                   {days.map((_, dayIdx) => {
                     const code = empAssignments[String(dayIdx)];
                     const shift = code ? result.shifts[code] : undefined;
+                    const flags = code ? flagsFor(code) : undefined;
                     return (
                       <td
                         key={dayIdx}
                         className="border-b border-r p-1 text-center"
                       >
-                        <ShiftCell code={code} shift={shift} isDark={isDark} />
+                        <ShiftCell
+                          code={code}
+                          shift={shift}
+                          isWork={flags?.is_work_shift ?? true}
+                          isNight={flags?.is_night_shift ?? false}
+                          isDark={isDark}
+                        />
                       </td>
                     );
                   })}
@@ -177,10 +206,14 @@ export function RosterGrid({ result, demands, maxConsecWarnAt = 6 }: Props) {
 function ShiftCell({
   code,
   shift,
+  isWork,
+  isNight,
   isDark,
 }: {
   code: string | undefined;
   shift: RosterShiftInfo | undefined;
+  isWork: boolean;
+  isNight: boolean;
   isDark: boolean;
 }) {
   if (!code || !shift) {
@@ -194,7 +227,7 @@ function ShiftCell({
     );
   }
 
-  const isLeave = !shift.is_work_shift;
+  const isLeave = !isWork;
   const colors = isLeave ? null : groupColor(shift.group, isDark);
 
   const style = colors
@@ -217,7 +250,7 @@ function ShiftCell({
           )}
         >
           {code}
-          {shift.is_night_shift && (
+          {isNight && (
             <Moon
               className="absolute right-1 top-1 h-3 w-3 opacity-70"
               aria-label="Night shift"
@@ -234,8 +267,8 @@ function ShiftCell({
           </div>
           <div className="text-[0.7rem] text-muted-foreground">
             Group {shift.group}
-            {shift.is_night_shift && " · night"}
-            {!shift.is_work_shift && " · leave"}
+            {isNight && " · night"}
+            {!isWork && " · leave"}
           </div>
         </div>
       </TooltipContent>

@@ -18,8 +18,11 @@ import { z } from "zod";
 export const rosterShiftSchema = z.object({
   name: z.string(),
   group: z.string(),
-  is_work_shift: z.boolean(),
-  is_night_shift: z.boolean(),
+  // Older rosters were solved before these flags were persisted on the result.
+  // Leave them optional here so the renderer can fall back to the live
+  // shift-group flags rather than guess a wrong default at parse time.
+  is_work_shift: z.boolean().optional(),
+  is_night_shift: z.boolean().optional(),
   start_time: z.number().int(),
   end_time: z.number().int(),
   work_time: z.number().int(),
