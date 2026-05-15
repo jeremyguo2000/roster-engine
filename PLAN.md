@@ -10,8 +10,8 @@
 | 4 | Shifts page | ✅ Done |
 | 5 | Staff page | ✅ Done |
 | 6 | Profiles page | ✅ Done |
-| 7 | Generate wizard | ⏳ Next |
-| 8 | Rosters page (list + RosterGrid + RosterSummary) | ⬜ Pending |
+| 7 | Generate wizard | ✅ Done |
+| 8 | Rosters page (list + RosterGrid + RosterSummary) | ⏳ Next |
 | 9 | Calendar + Day/Range timetable modals | ⬜ Pending |
 | 10 | Tests + end-to-end smoke verification | ⬜ Pending |
 
@@ -89,6 +89,17 @@ Verified end-to-end via Playwright against the live backend: DSG / ESG / Leaves 
   - **Rules** (`components/profiles/ProfileRulesTab.tsx`) — dynamic list of `{trigger, trigger_val, offset, enforce, enforce_val}` rows with `*` wildcard option, add/remove, batch Save; renders an example in the help text
 - Tab active state uses the primary-blue button styling for clear feedback; modal is `size="wide"` (1200px) so the tables breathe.
 - Build passes; live-tested against the seed "Ward A Weekly" profile (3 rules, weights pre-set).
+
+### Step 7 — Done
+- `pages/GeneratePage.tsx` — single-page 5-section wizard:
+  1. **Profile & name** — dropdown of profiles + roster-name input
+  2. **Date range & target hours** — `roster_start`, `num_days`, target hours per staff (converted to `target_work_min = hours × 60`), plus a "Chain from previous roster" dropdown of draft/approved rosters
+  3. **Leaves preview** — auto-queries `GET /api/staff/leaves?from_date=&to_date=` over the chosen window, read-only table (or empty-state if none)
+  4. **Demands** — one card per date in the window, each showing per-row `{start HH:MM, end HH:MM, headcount, skill}` editors with add/remove; "Copy day 1 to all days" shortcut duplicates the first day's demand list
+  5. **Generate** — footer summary ("N demands across M days") + primary "Run Solver" button (disabled until profile + name + ≥ 1 demand are valid)
+- Submit flow: POSTs every demand → collects IDs → POSTs `/api/rosters` with `{profile_id, name, roster_start, num_days, target_work_min, demand_ids, previous_roster_id?}` → toasts + navigates to `/rosters`
+- React Query handles the leaves-preview refetch when the date window changes; the existing `RosterJobWatcher` picks up the new running roster and drives the nav badge + completion toast — no extra plumbing needed here.
+- Live-rendered with the "Ward A Weekly" profile and the May 15 start; empty-state copy and disabled CTA copy both render as designed.
 
 ## Context
 
