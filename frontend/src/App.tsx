@@ -9,25 +9,30 @@ import LoginPage from "./pages/LoginPage";
 import Nav from "./components/Nav";
 import { AuthProvider } from "./auth/AuthContext";
 import RequireAuth from "./auth/RequireAuth";
+import { ToastProvider } from "./components/Toast";
+import RosterJobWatcher from "./components/RosterJobWatcher";
 
 export default function App() {
   return (
     <AuthProvider>
-      <div className="app-shell">
-        <Nav />
-        <main className="main">
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<Navigate to="/rosters" replace />} />
-            <Route path="/rosters" element={<RequireAuth><RostersPage /></RequireAuth>} />
-            <Route path="/shifts" element={<RequireAuth><ShiftsPage /></RequireAuth>} />
-            <Route path="/staff" element={<RequireAuth><StaffPage /></RequireAuth>} />
-            <Route path="/profiles" element={<RequireAuth><ProfilesPage /></RequireAuth>} />
-            <Route path="/generate" element={<RequireAuth><GeneratePage /></RequireAuth>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </main>
-      </div>
+      <ToastProvider>
+        <RosterJobWatcher />
+        <div className="app-shell">
+          <Nav />
+          <main className="main">
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/" element={<Navigate to="/rosters" replace />} />
+              <Route path="/rosters" element={<RequireAuth><RostersPage /></RequireAuth>} />
+              <Route path="/shifts" element={<RequireAuth><ShiftsPage /></RequireAuth>} />
+              <Route path="/staff" element={<RequireAuth><StaffPage /></RequireAuth>} />
+              <Route path="/profiles" element={<RequireAuth><ProfilesPage /></RequireAuth>} />
+              <Route path="/generate" element={<RequireAuth><GeneratePage /></RequireAuth>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </main>
+        </div>
+      </ToastProvider>
     </AuthProvider>
   );
 }

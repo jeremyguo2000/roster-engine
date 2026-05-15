@@ -1,9 +1,11 @@
 import { NavLink } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
+import { useRunningRosters } from "../hooks/useRunningRosters";
 
 export default function Nav() {
   const { user, logout } = useAuth();
+  const { data: running = [] } = useRunningRosters();
 
   return (
     <nav className="nav">
@@ -20,6 +22,12 @@ export default function Nav() {
         </div>
       )}
       <div className="nav-right">
+        {user && running.length > 0 && (
+          <div className="nav-job-status" title={running.map((r) => r.name).join(", ")}>
+            <div className="nav-spinner" />
+            <span>Solving…</span>
+          </div>
+        )}
         {user && (
           <>
             <span className="nav-user">{user.username}</span>

@@ -6,8 +6,8 @@
 |---|---|---|
 | 1 | Scaffold (package.json, tsconfig, index.html, design tokens, App skeleton) | ✅ Done |
 | 2 | Auth + API client + Login page | ✅ Done |
-| 3 | API modules + shared UI (Modal, Toast, Nav badge) | ⏳ Next |
-| 4 | Shifts page | ⬜ Pending |
+| 3 | API modules + shared UI (Modal, Toast, Nav badge) | ✅ Done |
+| 4 | Shifts page | ⏳ Next |
 | 5 | Staff page | ⬜ Pending |
 | 6 | Profiles page | ⬜ Pending |
 | 7 | Generate wizard | ⬜ Pending |
@@ -36,6 +36,25 @@
 - `vite.config.js` — switched to `loadEnv()` so `.env.development`'s `VITE_PROXY_TARGET` is honoured (previously `process.env` wasn't populated in the config context)
 
 Verified end-to-end via Playwright: bad credentials surface the backend's `detail` string ("Invalid username or password."), and visiting `/rosters` while logged out redirects to `/login`.
+
+### Step 3 — Done
+- Typed API modules mirroring backend routers and schemas:
+  - `src/api/shifts.ts` — shift groups + shifts CRUD
+  - `src/api/staff.ts` — staff groups, staff, skills, permitted-shifts, leaves
+  - `src/api/skills.ts` — skill types + values
+  - `src/api/profiles.ts` — profiles, profile-staff (incl. bulk add-group), profile-shifts (incl. bulk add-group), `ProfileConfig` typed with solver weights + conditional-constraint shape
+  - `src/api/demands.ts` — demand list/get/create
+  - `src/api/rosters.ts` — list/get/create/approve/discard/delete, demands preview, leaves preview, plus a `RosterResult` shape that mirrors `_result_to_json`
+- Shared UI:
+  - `components/Modal.tsx` — keyboard `Escape` close, click-overlay close, `size` prop for `md` / `wide-md` / `wide`
+  - `components/Toast.tsx` — `ToastProvider` + `useToast()` hook with `info` / `success` / `error` tones, auto-dismiss timer, sticky option (duration 0)
+- Polling + nav badge:
+  - `hooks/useRunningRosters.ts` — React Query poll of `GET /api/rosters?status=running` every 3 s while authenticated
+  - `components/RosterJobWatcher.tsx` — diff-watches the running set, re-fetches each transitioned roster to learn its final status + name, toasts `${name} saved as draft ✓` / `Solver failed for ${name}`, invalidates the rosters cache
+  - `Nav.tsx` — renders the spinner + "Solving…" pill in the right side of the nav when one or more rosters are running (uses the warm primary-soft tint from the design tokens)
+- `App.tsx` — wrapped in `ToastProvider`, `RosterJobWatcher` mounted once
+
+Build still passes (`npm run build` produces zero TS errors); the running poll is gated on `useAuth().user` so it doesn't fire on the login screen.
 
 ## Context
 
