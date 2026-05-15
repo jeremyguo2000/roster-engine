@@ -5,8 +5,8 @@
 | # | Step | Status |
 |---|---|---|
 | 1 | Scaffold (package.json, tsconfig, index.html, design tokens, App skeleton) | ✅ Done |
-| 2 | Auth + API client + Login page | ⏳ Next |
-| 3 | API modules + shared UI (Modal, Toast, Nav badge) | ⬜ Pending |
+| 2 | Auth + API client + Login page | ✅ Done |
+| 3 | API modules + shared UI (Modal, Toast, Nav badge) | ⏳ Next |
 | 4 | Shifts page | ⬜ Pending |
 | 5 | Staff page | ⬜ Pending |
 | 6 | Profiles page | ⬜ Pending |
@@ -24,6 +24,18 @@
 - `src/main.tsx` wires `BrowserRouter` + `QueryClientProvider`
 - `src/App.tsx` routes `/login`, `/rosters`, `/shifts`, `/staff`, `/profiles`, `/generate` with a top `Nav`
 - Placeholder pages compile; `npm run build` produces zero TS errors and the dev server boots at `:5173`
+
+### Step 2 — Done
+- `src/api/client.ts` — axios instance at `baseURL: /api`, request interceptor injects `Authorization: Bearer <token>` from `localStorage`, response interceptor clears token + fires `on401` redirect, `errorMessage()` helper unpacks FastAPI `detail` strings (incl. validation arrays)
+- `src/api/auth.ts` — typed wrappers for `POST /auth/login`, `GET /auth/me`, `POST /auth/change-password`
+- `src/auth/AuthContext.tsx` — `AuthProvider` hydrates the user via `/auth/me` on mount when a token exists, exposes `login(username, password)` and `logout()`, wires the 401 redirect via `setOn401`
+- `src/auth/RequireAuth.tsx` — route guard that redirects unauthenticated users to `/login` and preserves the intended URL in `location.state.from`
+- `src/pages/LoginPage.tsx` — form, error inline alert, redirect-to-`from` on success
+- `App.tsx` — wraps the tree in `<AuthProvider>` and guards `/rosters`, `/shifts`, `/staff`, `/profiles`, `/generate`
+- `Nav.tsx` — shows username + "Sign out" button when authenticated; hides tabs on the login screen
+- `vite.config.js` — switched to `loadEnv()` so `.env.development`'s `VITE_PROXY_TARGET` is honoured (previously `process.env` wasn't populated in the config context)
+
+Verified end-to-end via Playwright: bad credentials surface the backend's `detail` string ("Invalid username or password."), and visiting `/rosters` while logged out redirects to `/login`.
 
 ## Context
 
