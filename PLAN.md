@@ -1,0 +1,265 @@
+# Build a Web Frontend at `frontend/` with Full Parity to the Old Flask App
+
+## Progress Tracker
+
+| # | Step | Status |
+|---|---|---|
+| 1 | Scaffold (package.json, tsconfig, index.html, design tokens, App skeleton) | ✅ Done |
+| 2 | Auth + API client + Login page | ⏳ Next |
+| 3 | API modules + shared UI (Modal, Toast, Nav badge) | ⬜ Pending |
+| 4 | Shifts page | ⬜ Pending |
+| 5 | Staff page | ⬜ Pending |
+| 6 | Profiles page | ⬜ Pending |
+| 7 | Generate wizard | ⬜ Pending |
+| 8 | Rosters page (list + RosterGrid + RosterSummary) | ⬜ Pending |
+| 9 | Calendar + Day/Range timetable modals | ⬜ Pending |
+| 10 | Tests + end-to-end smoke verification | ⬜ Pending |
+
+### Step 1 — Done
+- `package.json` declares React 18, react-router-dom v6, @tanstack/react-query v5, axios, vitest + @testing-library
+- `tsconfig.json` (strict, single config — no project references)
+- `index.html` loads Inter / Source Serif 4 / JetBrains Mono from Google Fonts
+- `.env.development` sets `VITE_PROXY_TARGET=http://localhost:8000` for local-only dev (Docker setups still work via the existing fallback in `vite.config.js`)
+- `src/styles/global.css` carries all design tokens (palette, type scale, spacing, badges, buttons, modal/toast scaffolding)
+- `src/main.tsx` wires `BrowserRouter` + `QueryClientProvider`
+- `src/App.tsx` routes `/login`, `/rosters`, `/shifts`, `/staff`, `/profiles`, `/generate` with a top `Nav`
+- Placeholder pages compile; `npm run build` produces zero TS errors and the dev server boots at `:5173`
+
+## Context
+
+The user previously built a Flask-rendered webapp (running at `http://127.0.0.1:5000`) that drives the roster engine via the **old** API surface (`/api/rosters/calendar`, `/api/jobs/status`, `/api/export/...`, etc.). The current backend in this repo is a different FastAPI service with a richer, JWT-protected API and **no** server-side templating. The `frontend/` directory has a stale Vite/React/TS scaffold (`vite.config.js` with `/api` → `http://backend:8000` proxy) but no `src/`, no `package.json`, and an empty `node_modules`.
+
+Goal: build a React + Vite + TypeScript SPA that **reproduces the original UX in full**, but talks to the current FastAPI backend and uses the backend's domain terms ("Profile", "Staff", "Shift", "Demand", "Roster"). Excel export is out of scope (no backend endpoint).
+
+## Source of UX Truth (Old Flask App)
+
+Pages reverse-engineered from `http://127.0.0.1:5000`:
+
+| Old path | Purpose | Maps to new backend resource |
+|---|---|---|
+| `/rosters` (and `/`) | Monthly calendar + approved list + drafts grid + day/range Gantt modals | `Roster` |
+| `/shifts` | Shift groups + shifts CRUD | `ShiftGroup`, `Shift` |
+| `/nurses` | Staff CRUD + skills + permitted shifts | `Staff`, `StaffSkill`, `StaffPermittedShift` |
+| `/templates` | Profile config (shift groups, conditional-constraint rules, staff inclusion) | `Profile`, `ProfileStaff`, `ProfileShift` |
+| `/generate` | 5-step wizard: template → date range/target hours → leaves → demands → run solver | `POST /api/rosters` |
+
+Key behavioural details to preserve (visuals will be re-skinned — see Visual Design below):
+- Calendar day states: `approved` (filled), `lookahead` (pale), `none` (empty); click 1 → start, click 2 → end, click 3 → reset
+- Day timetable modal: 36-hour Gantt window 18:00 prev-day → 09:00 next-day; NSG shifts from `d-1` and `d+1` spill into view
+- Range timetable modal: multi-day Gantt with one midnight separator per day and NSG spillover at both boundaries
+- Roster grid: staff × days, shift code per cell tinted by group colour
+- Per-staff summary: work hours, weekend days, night shifts, max consecutive working days (use `result.staff_max_consec` directly)
+- Top-nav "Solving…" badge driven by polling; toast on completion / failure
+
+## Visual Design
+
+Clean and professional, no clutter — re-skinned from the original (do **not** carry over the old Flask app's red/blue/purple group palette into the chrome; reserve colours for data).
+
+**Palette**
+- **Primary**: deep blue `#1B4F8C` — nav, primary buttons, focused inputs, active calendar dates, links
+- **Accent / Alert**: bright red `#E63946` — used **sparingly**, only for destructive actions (Delete, Discard), error toasts, validation errors, the "Failed" roster status badge
+- **Warm grey scale** (not pure black/white):
+  - `--bg`        `#FAF8F5` — page background (warm off-white)
+  - `--surface`   `#FFFFFF` — cards, modals
+  - `--border`    `#E7E2D9` — hairline dividers
+  - `--muted`     `#8A8378` — secondary text, captions
+  - `--ink`       `#2B2A28` — primary text (warm near-black, never `#000`)
+  - `--ink-soft`  `#5A5650` — body copy on light surfaces
+- **Status tints** (low-saturation, used as badge backgrounds only):
+  - Approved: `#DCE9DA` bg / `#2F5E3A` text
+  - Draft:    `#E6E0D2` bg / `#6B5A2B` text
+  - Running:  `#DAE4EE` bg / `#1B4F8C` text
+  - Failed:   `#F5D7D9` bg / `#9B2C32` text
+- **Group colours for roster data** (cells, Gantt bars — kept distinct from chrome palette): `DSG #2B6CB0`, `ESG #6B46C1`, `NSG #C84B31`, `Off #4A5568`, `Leaves #2D6A4F`
+
+**Typography**
+- UI sans: **Inter** (or system stack fallback `-apple-system, "Segoe UI", Roboto, …`) — replaces DM Sans
+- Display / page titles: **Source Serif 4** at 600 weight — replaces DM Serif Display, retains the editorial feel without being decorative
+- Monospace (codes, times, IDs): **JetBrains Mono** — replaces DM Mono
+- Type scale: 12 / 13 / 14 / 16 / 20 / 28 / 36 px; line-height 1.5 for body, 1.2 for headings
+- Tabular numbers (`font-variant-numeric: tabular-nums`) on all tables and timetables so columns align
+
+**Spacing & layout**
+- 4-pt base grid; component padding scales 8 / 12 / 16 / 24 / 32 / 48
+- Cards: 24px padding, 1px `--border` hairline, 8px radius, **no shadow** (depth via border + spacing, not drop-shadows)
+- Page gutters: 32px on narrow, 48px on wide; max content width 1280px; full-width allowed only for the roster grid + Gantt views
+- Generous vertical rhythm — at least 24px between sections, 32px between major blocks
+- Sticky top nav: 56px tall, `--surface` background, 1px bottom border (no shadow)
+
+**Component conventions**
+- Buttons: 36px tall (32px for `.btn-sm`), 6px radius, 14px text. Primary = filled `#1B4F8C`/white. Secondary = white surface with `--border` outline. Danger = filled `#E63946`/white, **only** on destructive paths.
+- Inputs: 36px tall, `--border` outline, focus ring `#1B4F8C` at 2px with 4px outer halo, no inner shadow.
+- Tables: zebra disabled by default; row hover `#F5F1EB`; header row uppercase 11px tracked-out caption.
+- Modals: white surface, 24px radius hairline border, page-level overlay at `rgba(43,42,40,0.32)` (warm scrim, not black).
+- Toasts: bottom-right stack; success uses primary blue tint, error uses accent red tint, neutral uses warm-grey tint.
+- Focus visible everywhere — keyboard accessibility is non-negotiable.
+
+All tokens land in `src/styles/global.css` as CSS custom properties so the palette is single-source-of-truth and easy to retune.
+
+## Tech Stack
+
+- **Vite + React 18 + TypeScript** (matches existing `vite.config.js`)
+- **react-router-dom v6** for routing
+- **@tanstack/react-query** for server state, polling (`refetchInterval` while a roster is `running`), and cache invalidation after mutations
+- **axios** with a request interceptor that injects `Authorization: Bearer <token>` from `localStorage`, and a 401 response interceptor that redirects to `/login`
+- **react-hook-form + zod** for the Generate wizard and edit modals
+- **Plain CSS** — keeps the design tokens single-source-of-truth in `src/styles/global.css`, no Tailwind/MUI dependency
+- **vitest + @testing-library/react** for unit/component tests (already declared in the existing `vite.config.js`)
+
+## Cross-Cutting Concerns
+
+### Auth
+- `POST /api/auth/login` → store `access_token` in `localStorage` + React context
+- `AuthProvider` wraps the app; `RequireAuth` route guard redirects to `/login` when missing/invalid
+- All other endpoints require the JWT — handled by axios interceptor
+
+### Polling solver progress
+The old app had a global `/api/jobs/status` poller. The new backend has none, so we replicate it via React Query:
+- After `POST /api/rosters`, the returned roster has `status: "running"` and a `celery_task_id`
+- A `useRunningRosters` hook does `GET /api/rosters?status=running` every 3 s; when the list becomes non-empty the nav shows the "Solving…" badge
+- For an individual roster view, `useRoster(id)` uses `refetchInterval: (data) => data?.status === 'running' ? 3000 : false`
+- On transition `running → draft` we toast "Saved as draft ✓" and invalidate the rosters list query
+- On `running → failed` we toast the failure message
+
+### Deriving the calendar and day views (no backend endpoint exists)
+The old API had `/api/rosters/calendar?year&month` and `/api/rosters/day/{date}`. The new backend has neither, so we derive client-side from `GET /api/rosters` (all rosters, status filter optional) plus each roster's `result` payload:
+- **Calendar**: for each approved roster, mark dates `[roster_start, roster_start + num_days - lookahead)` as `approved` and the lookahead tail as `lookahead`
+- **Day timetable**: pull the three rosters covering `d-1`, `d`, `d+1` (often the same roster), then read `result.assignments[name][dayIndex]` and `result.shifts[code]` to build the Gantt
+- `result.shifts[code]` already contains `start_time`, `end_time`, `group`, `work_time` (see [backend/app/worker/tasks.py](backend/app/worker/tasks.py) `_result_to_json`)
+
+If derivation proves too slow at scale, we can later add `/api/rosters/calendar` and `/api/rosters/day/{date}` server-side, but it is unnecessary for v1.
+
+## File Structure
+
+```
+frontend/
+├── package.json                    # NEW — declare deps
+├── index.html                      # NEW — Vite entry
+├── vite.config.js                  # exists, keep as-is
+├── tsconfig.json                   # NEW — strict TS
+├── src/
+│   ├── main.tsx                    # ReactDOM + QueryClient + Router
+│   ├── App.tsx                     # routes
+│   ├── api/
+│   │   ├── client.ts               # axios instance + interceptors
+│   │   ├── auth.ts                 # login, me, change-password
+│   │   ├── rosters.ts              # list/get/create/approve/discard + result types
+│   │   ├── profiles.ts             # profile + profile-staff + profile-shifts
+│   │   ├── staff.ts                # staff + skills + permitted-shifts + leaves
+│   │   ├── shifts.ts               # shift groups + shifts
+│   │   ├── demands.ts              # demands CRUD
+│   │   └── skills.ts               # skill types + values
+│   ├── auth/
+│   │   ├── AuthContext.tsx
+│   │   └── RequireAuth.tsx
+│   ├── components/
+│   │   ├── Nav.tsx                 # top nav + Solving… badge
+│   │   ├── Modal.tsx
+│   │   ├── Toast.tsx + ToastProvider.tsx
+│   │   ├── RosterGrid.tsx          # staff × days table
+│   │   ├── RosterSummary.tsx       # per-staff stats table
+│   │   ├── DayTimetable.tsx        # 36-hour Gantt
+│   │   ├── RangeTimetable.tsx      # multi-day Gantt
+│   │   └── Calendar.tsx            # month grid + selection state
+│   ├── pages/
+│   │   ├── LoginPage.tsx
+│   │   ├── RostersPage.tsx
+│   │   ├── ShiftsPage.tsx
+│   │   ├── StaffPage.tsx
+│   │   ├── ProfilesPage.tsx
+│   │   └── GeneratePage.tsx        # 5-step wizard
+│   ├── hooks/
+│   │   ├── useRosters.ts
+│   │   ├── useRoster.ts            # polls while running
+│   │   ├── useRunningRosters.ts    # drives nav badge
+│   │   └── useToast.ts
+│   ├── lib/
+│   │   ├── timetable.ts            # window math: WIN_START/WIN_END, bar clipping
+│   │   ├── calendar.ts             # roster-list → day-status map
+│   │   ├── colours.ts              # groupColour map
+│   │   └── time.ts                 # min-from-midnight ↔ HH:MM helpers
+│   ├── styles/
+│   │   └── global.css              # design tokens + utility classes
+│   └── test/
+│       ├── setup.ts
+│       └── (per-component test files)
+```
+
+## Page Plan
+
+### `/login` — `LoginPage.tsx`
+- Form: username, password
+- On submit: `POST /api/auth/login` → store token → navigate to `/rosters`
+
+### `/rosters` — `RostersPage.tsx`
+- **Calendar**: month nav + grid; `useRosters({status: 'approved'})` → derive day-status map via `lib/calendar.ts`. Click-1/2/3 selection state local. On range-confirm, open `DayTimetable` or `RangeTimetable` modal.
+- **Approved list**: collapsible cards; each shows `RosterGrid` + `RosterSummary` on expand. Buttons: approve (n/a — already approved), delete (`POST /api/rosters/{id}/discard`).
+- **Drafts list**: card grid; buttons: View (opens modal with `RosterGrid`), Approve (`POST /api/rosters/{id}/approve`), Delete.
+
+### `/shifts` — `ShiftsPage.tsx`
+- List shift groups (`GET /api/shifts/groups`); inside each, list shifts (`GET /api/shifts?group_id=`).
+- Add Group modal, Add Shift modal, Edit Shift modal, Delete buttons. All CRUD endpoints in [backend/app/api/shifts.py](backend/app/api/shifts.py).
+
+### `/staff` — `StaffPage.tsx` (path renamed from `/nurses`)
+- List staff (`GET /api/staff`), filter by `staff_group_id`.
+- Add Staff modal, Edit Staff (PATCH), Soft-delete (`POST /api/staff/{id}/delete`).
+- "Skills" modal: add/remove `StaffSkill` via `/api/staff/{id}/skills`.
+- "Permitted Shifts" modal: tree of shift groups → shifts with bulk-select; persist via `/api/staff/{id}/permitted-shifts`.
+- Leaves: separate section (or sub-page) using `/api/staff/leaves` CRUD.
+
+### `/profiles` — `ProfilesPage.tsx` (path renamed from `/templates`)
+- List profiles (`GET /api/profiles`); each card shows config summary.
+- Create/Edit modal with tabs:
+  - **Basics**: name
+  - **Shift groups & shifts**: bulk-add a `ShiftGroup` via `/api/profiles/{id}/shifts/add-group/{group_id}`; per-shift add/remove
+  - **Staff inclusion**: bulk-add a `StaffGroup`; per-staff `excluded` toggle
+  - **Solver config** (JSONB): inputs for `time_limit`, `weight_overstaff`, `weight_consec`, `weight_burden`, `weight_night`, `weight_weekend`
+  - **Conditional constraints**: dynamic rule rows `{trigger, trigger_val, offset, enforce, enforce_val}` (matches CLAUDE.md schema)
+
+### `/generate` — `GeneratePage.tsx`
+- 5-step single-page wizard (same flow as the old `/generate`):
+  1. **Profile** (dropdown from `GET /api/profiles`)
+  2. **Date range & target hours** — `roster_start`, `num_days`, `target_work_min`, optional `previous_roster_id` for chaining
+  3. **Leaves preview** — call `GET /api/rosters/{previous_id}/leaves` if chaining; otherwise show `GET /api/staff/leaves?from_date&to_date`. Rows are read-only previews (creation lives on Staff page).
+  4. **Demands** — per-day list; `+ Demand` adds a row (`{start_min, end_min, headcount, skill_value_id?}`); `Copy day 1 to all days` shortcut. Submitting POSTs each demand to `/api/demands` and collects their IDs.
+  5. **Generate** — `POST /api/rosters` with `{profile_id, name, roster_start, num_days, target_work_min, demand_ids, previous_roster_id?}`; redirect to `/rosters` and let the nav badge poll.
+
+## Critical Files to Reuse / Reference
+
+- [backend/app/api/rosters.py](backend/app/api/rosters.py) — request/response schemas for the Roster create + result polling flow
+- [backend/app/worker/tasks.py](backend/app/worker/tasks.py) — `_result_to_json` defines the exact shape of `Roster.result` (`assignments`, `shifts`, `staff`, `staff_max_consec`, etc.) that `RosterGrid`, `DayTimetable`, `RangeTimetable` will read
+- [backend/app/schemas/](backend/app/schemas/) — Pydantic models to mirror as TS types in `src/api/*.ts`
+- The downloaded reference HTML at `/tmp/rosters-page.html`, `/tmp/staff.html`, `/tmp/shifts.html`, `/tmp/templates.html`, `/tmp/generate.html`, `/tmp/nurses.html` capture every JS function from the old app — port the calendar selection, Gantt window math, and roster-grid rendering logic from there
+
+## Verification
+
+End-to-end check before declaring done:
+
+1. **Stand the stack up**:
+   ```bash
+   docker compose -f docker-compose.dev.yml up -d
+   docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
+   docker compose -f docker-compose.dev.yml exec backend python -m app.scripts.create_user
+   cd frontend && npm install && npm run dev   # serves at :5173, proxies /api
+   ```
+2. **Manual smoke (via Playwright MCP if browser available, else by hand)**:
+   - Log in → land on `/rosters` empty state
+   - Create a Shift Group + 3 shifts (DSG, ESG, NSG)
+   - Create 3 Staff with skills + permitted shifts
+   - Create a Profile that bundles them with default solver weights
+   - On `/generate`: pick the profile → 7-day range, 2400 target_work_min, no leaves, add 1 demand per day → Run Solver
+   - Nav badge shows "Solving…" → toast "Saved as draft ✓" within ≤ time_limit
+   - Open the draft → `RosterGrid` renders staff × 7 days with coloured cells → `RosterSummary` shows non-zero hours
+   - Approve → roster moves to Approved list → calendar highlights the date range
+   - Click two calendar dates → Range Timetable modal renders Gantt with at least one bar per staff per day
+3. **Automated**:
+   - `cd frontend && npm test` — vitest suite for `lib/timetable.ts` (Gantt clipping math), `lib/calendar.ts` (day-status derivation), and `RosterGrid` snapshot
+   - `cd backend && conda activate roster-engine && pytest` — backend regression suite still passes
+4. **Type/lint**: `npm run build` produces zero TS errors
+
+## Out of Scope (deferred)
+
+- Excel / xlsx export (no backend endpoint; revisit once `/api/rosters/{id}/export` exists)
+- Server-side calendar/day aggregation endpoints (current derivation is fast enough for v1)
+- Mobile-responsive Gantt (original isn't either)
+- User-management UI (`/api/auth/users` CRUD) — backend has it; UI can come later
