@@ -11,8 +11,8 @@
 | 5 | Staff page | ✅ Done |
 | 6 | Profiles page | ✅ Done |
 | 7 | Generate wizard | ✅ Done |
-| 8 | Rosters page (list + RosterGrid + RosterSummary) | ⏳ Next |
-| 9 | Calendar + Day/Range timetable modals | ⬜ Pending |
+| 8 | Rosters page (list + RosterGrid + RosterSummary) | ✅ Done |
+| 9 | Calendar + Day/Range timetable modals | ⏳ Next |
 | 10 | Tests + end-to-end smoke verification | ⬜ Pending |
 
 ### Step 1 — Done
@@ -100,6 +100,25 @@ Verified end-to-end via Playwright against the live backend: DSG / ESG / Leaves 
 - Submit flow: POSTs every demand → collects IDs → POSTs `/api/rosters` with `{profile_id, name, roster_start, num_days, target_work_min, demand_ids, previous_roster_id?}` → toasts + navigates to `/rosters`
 - React Query handles the leaves-preview refetch when the date window changes; the existing `RosterJobWatcher` picks up the new running roster and drives the nav badge + completion toast — no extra plumbing needed here.
 - Live-rendered with the "Ward A Weekly" profile and the May 15 start; empty-state copy and disabled CTA copy both render as designed.
+
+### Step 8 — Done
+- **Corrected `RosterResult` typing** to match what the backend actually emits (the plan's earlier guess was wrong):
+  - `staff: Array<{fullname, employee_id}>` (not `string[]`)
+  - `assignments: Record<employee_id, Record<dayIdxString, shiftCode>>` (sparse — unassigned days are absent)
+  - `staff_max_consec: Record<employee_id, number>` plus `consec_days` per day
+  - `RosterShiftInfo` drops the spurious `code` (it's the map key) and adds optional `is_work_shift` / `is_night_shift`
+- `lib/colours.ts` — single source of truth for the group colour palette (DSG / ESG / NSG / Off / Leaves)
+- `components/RosterGrid.tsx` — staff × days table with:
+  - Sticky-left Staff column showing fullname + employee_id underneath
+  - Sticky weekday + DD/MM headers, weekends tinted with `--hover`
+  - Colour-tinted cells using `groupColour(info.group) + "1A"` for a soft fill, full strength text colour, hover title with full shift name
+  - Sparse-friendly: missing day index → "—"
+- `components/RosterSummary.tsx` — work hrs, weekend days, night shifts, and `staff_max_consec` per staff
+- `pages/RostersPage.tsx`:
+  - Four sections: **Solving** (running rosters with inline spinner badge), **Failed** (with Discard), **Drafts** (View / Approve / Discard), **Approved** (▼ Show / ▲ Hide expand inline)
+  - View modal embeds `RosterGrid` + `RosterSummary` + inline Approve / Discard buttons
+  - Page-level `useQuery` uses `refetchInterval` (3 s) only while at least one roster is `running`, complementing the global `RosterJobWatcher`
+- Verified end-to-end: opened a real draft → grid renders with 10 Ward A staff over 7 days, DSG/ESG/NSG colour tints applied, weekend columns shaded, the per-staff summary populates from `staff_max_consec`.
 
 ## Context
 

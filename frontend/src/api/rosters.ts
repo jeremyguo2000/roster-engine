@@ -8,21 +8,30 @@ export type RosterStatus = "running" | "draft" | "approved" | "failed";
  * Mirrors `_result_to_json` in backend/app/worker/tasks.py.
  */
 export interface RosterShiftInfo {
-  code: string;
   name: string;
   group: string;
   start_time: number;
   end_time: number;
   work_time: number;
+  is_work_shift?: boolean;
+  is_night_shift?: boolean;
+}
+
+export interface RosterStaffRef {
+  fullname: string;
+  employee_id: string;
 }
 
 export interface RosterResult {
   roster_start: string;
   num_days: number;
-  staff: string[];
+  status?: string;
+  staff: RosterStaffRef[];
   shifts: Record<string, RosterShiftInfo>;
-  assignments: Record<string, string[]>;
+  /** Keyed by employee_id, then by day-index string ("0".."num_days-1"), value is the shift code. Sparse — unassigned days are absent. */
+  assignments: Record<string, Record<string, string>>;
   staff_max_consec?: Record<string, number>;
+  max_consecutive?: number;
   [k: string]: unknown;
 }
 
