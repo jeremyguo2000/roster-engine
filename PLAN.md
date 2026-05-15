@@ -9,8 +9,8 @@
 | 3 | API modules + shared UI (Modal, Toast, Nav badge) | ✅ Done |
 | 4 | Shifts page | ✅ Done |
 | 5 | Staff page | ✅ Done |
-| 6 | Profiles page | ⏳ Next |
-| 7 | Generate wizard | ⬜ Pending |
+| 6 | Profiles page | ✅ Done |
+| 7 | Generate wizard | ⏳ Next |
 | 8 | Rosters page (list + RosterGrid + RosterSummary) | ⬜ Pending |
 | 9 | Calendar + Day/Range timetable modals | ⬜ Pending |
 | 10 | Tests + end-to-end smoke verification | ⬜ Pending |
@@ -78,6 +78,17 @@ Verified end-to-end via Playwright against the live backend: DSG / ESG / Leaves 
 - `components/staff/StaffSkillsModal.tsx` — pill view of current skills with ✕ to remove; below, each skill type's values render as toggle buttons (primary-blue when assigned)
 - `components/staff/PermittedShiftsModal.tsx` — per-group cards with All/None bulk toggles, per-shift checkbox/pill toggles, banner explaining restricted vs unrestricted mode
 - Builds cleanly; verified against the live backend showing 10 Ward A staff + one existing AL leave on 2026-05-07; Permitted Shifts modal renders shift groups with checked/unchecked states.
+
+### Step 6 — Done
+- `pages/ProfilesPage.tsx` — list of profile cards (name + one-line summary of `time_limit`, key weights, rule count) with Edit / Delete actions; `+ New Profile` opens a small "name only" create modal that, on success, immediately opens the edit modal so the user can fill in the rest.
+- Edit modal with five tabs:
+  - **Basics** — rename (PATCH `/profiles/{id}` `{name}`)
+  - **Shifts** (`components/profiles/ProfileShiftsTab.tsx`) — per-group cards listing shift codes as toggle buttons; "+ Bulk add" uses `POST /profiles/{id}/shifts/add-group/{group_id}`
+  - **Staff** (`components/profiles/ProfileStaffTab.tsx`) — per-group tables with Add / Exclude / Re-include / Remove; "+ Bulk add" uses the staff-group bulk endpoint
+  - **Solver** (`components/profiles/ProfileSolverTab.tsx`) — typed inputs for `weight_overstaff`, `weight_consec`, `weight_burden`, `weight_night`, `weight_weekend`, `time_limit`; dirty-tracking with a Save button that toggles its own label
+  - **Rules** (`components/profiles/ProfileRulesTab.tsx`) — dynamic list of `{trigger, trigger_val, offset, enforce, enforce_val}` rows with `*` wildcard option, add/remove, batch Save; renders an example in the help text
+- Tab active state uses the primary-blue button styling for clear feedback; modal is `size="wide"` (1200px) so the tables breathe.
+- Build passes; live-tested against the seed "Ward A Weekly" profile (3 rules, weights pre-set).
 
 ## Context
 
