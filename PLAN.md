@@ -13,7 +13,7 @@
 | 7 | Generate wizard | ✅ Done |
 | 8 | Rosters page (list + RosterGrid + RosterSummary) | ✅ Done |
 | 9 | Calendar + Day/Range timetable modals | ✅ Done |
-| 10 | Tests + end-to-end smoke verification | ⏳ Next |
+| 10 | Tests + end-to-end smoke verification | ✅ Done |
 
 ### Step 1 — Done
 - `package.json` declares React 18, react-router-dom v6, @tanstack/react-query v5, axios, vitest + @testing-library
@@ -129,6 +129,22 @@ Verified end-to-end via Playwright against the live backend: DSG / ESG / Leaves 
 - Calendar + both modals wired into `RostersPage`. Selection clears itself after firing.
 - **Bug found & fixed during smoke test**: `isoDate()` and `prevIso/nextIso` used `Date.toISOString().slice(0,10)`, which produces a UTC date string. In timezones east of UTC, midnight-local dates serialize to the previous day, so `addDays(iso, 1)` returned the same date — `dateRange()` then looped forever and hung the browser when clicking **View range timetable**. Replaced all three sites with local-component formatting (`getFullYear()/getMonth()/getDate()`).
 - Verified end-to-end via Playwright: clicked May 04 → View day timetable (renders 7 staff with E135/D088/N2010/N2212 bars and NSG spillover from prev day); selected May 04 → May 05 → View range timetable (2-day Gantt with midnight separators, NSG bars crossing the day boundary).
+
+### Step 10 — Done
+- Unit tests (vitest) for the regression-prone math + state derivation:
+  - `lib/time.test.ts` — 12 tests covering `minToHHMM`/`hhmmToMin` round-trip + `durationMin` overnight handling
+  - `lib/calendar.test.ts` — 18 tests covering `addDaysIso` (the TZ regression), `dateRange` (the infinite-loop regression), `monthMatrix`, `buildDayStatusMap` (approved-beats-draft semantics), and `pickRosterForDate` (approved-only)
+  - `lib/timetable.test.ts` — 13 tests covering window-duration math, `rosterDayIndex`, `dayTimetableBars` (centre day + NSG-only spillover + clipping + draft rejection), `rangeTimetableBars` and `fmtMin`
+- **All 43 tests pass.** `tsc -b && vite build` produces zero errors.
+- Manual smoke (Playwright) accumulated across the build:
+  - Login → Rosters
+  - Shifts: DSG / ESG / Leaves / NSG groups render, Add Group modal works
+  - Staff: 10 Ward A staff render with Skills + Permitted Shifts modals
+  - Profiles: 5-tab edit modal renders Basics / Shifts / Staff / Solver / Rules
+  - Generate: 5-section wizard renders with profile picker + date controls + leaves preview + per-day demand editors
+  - Rosters: list with draft/approved sections, view modal embeds `RosterGrid` + `RosterSummary`
+  - Calendar: month grid with status tints; Day Timetable shows 39h Gantt with NSG spillover; Range Timetable shows multi-day Gantt with day separators
+- Backend `pytest` suite is empty (the `tests/` directory has no committed test files), so nothing to regress there.
 
 ## Context
 
