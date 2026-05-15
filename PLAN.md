@@ -7,8 +7,8 @@
 | 1 | Scaffold (package.json, tsconfig, index.html, design tokens, App skeleton) | ✅ Done |
 | 2 | Auth + API client + Login page | ✅ Done |
 | 3 | API modules + shared UI (Modal, Toast, Nav badge) | ✅ Done |
-| 4 | Shifts page | ⏳ Next |
-| 5 | Staff page | ⬜ Pending |
+| 4 | Shifts page | ✅ Done |
+| 5 | Staff page | ⏳ Next |
 | 6 | Profiles page | ⬜ Pending |
 | 7 | Generate wizard | ⬜ Pending |
 | 8 | Rosters page (list + RosterGrid + RosterSummary) | ⬜ Pending |
@@ -55,6 +55,19 @@ Verified end-to-end via Playwright: bad credentials surface the backend's `detai
 - `App.tsx` — wrapped in `ToastProvider`, `RosterJobWatcher` mounted once
 
 Build still passes (`npm run build` produces zero TS errors); the running poll is gated on `useAuth().user` so it doesn't fire on the login screen.
+
+### Step 4 — Done
+- `lib/time.ts` — `minToHHMM` / `hhmmToMin` / `durationMin` helpers (overnight-aware: end ≤ start adds 1440)
+- `pages/ShiftsPage.tsx` — one card per shift group with:
+  - WORK / NIGHT / NON-WORK badges driven by `is_work_shift` and `is_night_shift`
+  - per-group `+ Shift` and `Delete` buttons (with `confirm()` on Delete)
+  - tables of shifts showing code, name, start/end (with `+1d` annotation when `end_min <= start_min`), work hours (decimal), break minutes, plus per-row Edit / ✕
+- Modals:
+  - **Add Shift Group** — code + work/night checkboxes
+  - **Add Shift / Edit Shift** (one component, two modes) — code, name, start/end as `HH:MM`, work hours (decimal), break minutes; live duration preview + "Overnight shift" hint when end ≤ start
+- All mutations go through React Query with `invalidateQueries({ queryKey: ["shifts"] })` and toast feedback (success or backend `detail` string on error)
+
+Verified end-to-end via Playwright against the live backend: DSG / ESG / Leaves / NSG groups render, overnight annotations show, and the Add Group modal opens with the correct styling.
 
 ## Context
 
