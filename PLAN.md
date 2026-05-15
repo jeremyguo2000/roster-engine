@@ -12,8 +12,8 @@
 | 6 | Profiles page | ✅ Done |
 | 7 | Generate wizard | ✅ Done |
 | 8 | Rosters page (list + RosterGrid + RosterSummary) | ✅ Done |
-| 9 | Calendar + Day/Range timetable modals | ⏳ Next |
-| 10 | Tests + end-to-end smoke verification | ⬜ Pending |
+| 9 | Calendar + Day/Range timetable modals | ✅ Done |
+| 10 | Tests + end-to-end smoke verification | ⏳ Next |
 
 ### Step 1 — Done
 - `package.json` declares React 18, react-router-dom v6, @tanstack/react-query v5, axios, vitest + @testing-library
@@ -119,6 +119,16 @@ Verified end-to-end via Playwright against the live backend: DSG / ESG / Leaves 
   - View modal embeds `RosterGrid` + `RosterSummary` + inline Approve / Discard buttons
   - Page-level `useQuery` uses `refetchInterval` (3 s) only while at least one roster is `running`, complementing the global `RosterJobWatcher`
 - Verified end-to-end: opened a real draft → grid renders with 10 Ward A staff over 7 days, DSG/ESG/NSG colour tints applied, weekend columns shaded, the per-staff summary populates from `staff_max_consec`.
+
+### Step 9 — Done
+- `lib/calendar.ts` — `buildDayStatusMap` (sorts by status rank, derives per-date approved/draft/none), `monthMatrix`, `dateRange`, `addDaysIso`, and a new `pickRosterForDate` that returns the single **approved** roster covering a date (drafts are never displayed in timetables — they're hypothetical).
+- `components/Calendar.tsx` — month grid with prev/next navigation, click-1/2/3 selection lifecycle, legend, action button bar that switches between **View day timetable** and **View range timetable** depending on selection. Cells colour-coded by status, with a ×N annotation when multiple rosters overlap.
+- `lib/timetable.ts` — Gantt window math: `DAY_WIN_START=1080` (18:00 prev day), `DAY_WIN_END = 2*1440 + 540`, `rangeWindowDuration(n) = (n+1)*1440 + 9*60 - 1080`. `dayTimetableBars` and `rangeTimetableBars` collect bars from the approved roster only, with NSG-only filtering on prev/next boundary days for natural spillover. Bars are clipped to the window.
+- `components/DayTimetable.tsx` — 39-hour ruler (18:00 → 09:00+2), hour ticks with bold 00:00/12:00, per-staff bars coloured by group.
+- `components/RangeTimetable.tsx` — multi-day Gantt with one midnight separator per day, weekend separators emphasised, NSG spillover at both boundaries.
+- Calendar + both modals wired into `RostersPage`. Selection clears itself after firing.
+- **Bug found & fixed during smoke test**: `isoDate()` and `prevIso/nextIso` used `Date.toISOString().slice(0,10)`, which produces a UTC date string. In timezones east of UTC, midnight-local dates serialize to the previous day, so `addDays(iso, 1)` returned the same date — `dateRange()` then looped forever and hung the browser when clicking **View range timetable**. Replaced all three sites with local-component formatting (`getFullYear()/getMonth()/getDate()`).
+- Verified end-to-end via Playwright: clicked May 04 → View day timetable (renders 7 staff with E135/D088/N2010/N2212 bars and NSG spillover from prev day); selected May 04 → May 05 → View range timetable (2-day Gantt with midnight separators, NSG bars crossing the day boundary).
 
 ## Context
 

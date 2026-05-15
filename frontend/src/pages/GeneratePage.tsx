@@ -23,7 +23,12 @@ function emptyDemand(): DemandDraft {
 }
 
 function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Use local components — toISOString() converts to UTC and shifts dates
+  // by 1 day in non-UTC timezones.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
 }
 
 function addDays(date: string, n: number): string {

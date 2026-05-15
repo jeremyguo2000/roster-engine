@@ -13,6 +13,9 @@ import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
 import RosterGrid from "../components/RosterGrid";
 import RosterSummary from "../components/RosterSummary";
+import Calendar from "../components/Calendar";
+import DayTimetable from "../components/DayTimetable";
+import RangeTimetable from "../components/RangeTimetable";
 
 export default function RostersPage() {
   const rostersQ = useQuery({
@@ -40,18 +43,28 @@ export default function RostersPage() {
   }, [rostersQ.data]);
 
   const [viewing, setViewing] = useState<Roster | null>(null);
+  const [dayView, setDayView] = useState<string | null>(null);
+  const [rangeView, setRangeView] = useState<{ from: string; to: string } | null>(null);
 
   return (
     <div>
       <div className="page-header">
         <div>
           <h1 className="page-title">Rosters</h1>
-          <p className="page-sub">Draft and approved rosters. Calendar view lands in step 9.</p>
+          <p className="page-sub">Calendar, drafts and approved rosters.</p>
         </div>
         <Link to="/generate" className="btn btn-primary">+ Generate Roster</Link>
       </div>
 
       {rostersQ.isLoading && <div className="empty-state">Loading…</div>}
+
+      {rostersQ.data && (
+        <Calendar
+          rosters={rostersQ.data}
+          onSelectDay={(d) => setDayView(d)}
+          onSelectRange={(from, to) => setRangeView({ from, to })}
+        />
+      )}
 
       {running.length > 0 && (
         <section className="section">
@@ -111,6 +124,22 @@ export default function RostersPage() {
           ) : (
             <div className="empty-state">No solver result attached.</div>
           )}
+        </Modal>
+      )}
+
+      {dayView && rostersQ.data && (
+        <Modal open onClose={() => setDayView(null)} title={`Day Timetable — ${dayView}`} size="wide">
+          <DayTimetable date={dayView} rosters={rostersQ.data} />
+        </Modal>
+      )}
+      {rangeView && rostersQ.data && (
+        <Modal
+          open
+          onClose={() => setRangeView(null)}
+          title={`Timetable — ${rangeView.from} → ${rangeView.to}`}
+          size="wide"
+        >
+          <RangeTimetable from={rangeView.from} to={rangeView.to} rosters={rostersQ.data} />
         </Modal>
       )}
     </div>
