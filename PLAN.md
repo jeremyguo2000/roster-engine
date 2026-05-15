@@ -8,8 +8,8 @@
 | 2 | Auth + API client + Login page | ✅ Done |
 | 3 | API modules + shared UI (Modal, Toast, Nav badge) | ✅ Done |
 | 4 | Shifts page | ✅ Done |
-| 5 | Staff page | ⏳ Next |
-| 6 | Profiles page | ⬜ Pending |
+| 5 | Staff page | ✅ Done |
+| 6 | Profiles page | ⏳ Next |
 | 7 | Generate wizard | ⬜ Pending |
 | 8 | Rosters page (list + RosterGrid + RosterSummary) | ⬜ Pending |
 | 9 | Calendar + Day/Range timetable modals | ⬜ Pending |
@@ -68,6 +68,16 @@ Build still passes (`npm run build` produces zero TS errors); the running poll i
 - All mutations go through React Query with `invalidateQueries({ queryKey: ["shifts"] })` and toast feedback (success or backend `detail` string on error)
 
 Verified end-to-end via Playwright against the live backend: DSG / ESG / Leaves / NSG groups render, overnight annotations show, and the Add Group modal opens with the correct styling.
+
+### Step 5 — Done
+- `pages/StaffPage.tsx`:
+  - Filter bar: staff group dropdown + "Show deleted" toggle
+  - Main staff table with employee_id, name, group, Active/Archived badge, and per-row Edit / Skills / Permitted / Archive (or Restore)
+  - Three secondary buttons in the header: **Skill types** (manage `SkillType` + `SkillValue` CRUD), **Staff groups** (inline rename + delete), **+ Add Staff**
+  - **Leaves** section at the bottom: staff/date-range filter, Add Leave modal, table with remove
+- `components/staff/StaffSkillsModal.tsx` — pill view of current skills with ✕ to remove; below, each skill type's values render as toggle buttons (primary-blue when assigned)
+- `components/staff/PermittedShiftsModal.tsx` — per-group cards with All/None bulk toggles, per-shift checkbox/pill toggles, banner explaining restricted vs unrestricted mode
+- Builds cleanly; verified against the live backend showing 10 Ward A staff + one existing AL leave on 2026-05-07; Permitted Shifts modal renders shift groups with checked/unchecked states.
 
 ## Context
 
