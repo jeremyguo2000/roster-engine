@@ -67,6 +67,11 @@ export const addProfileStaff = (profile_id: number, staff_id: number, excluded =
 export const addProfileStaffGroup = (profile_id: number, group_id: number) =>
   api.post(`/profiles/${profile_id}/staff/add-group/${group_id}`).then(() => undefined);
 
+export const removeProfileStaffGroup = (profile_id: number, group_id: number) =>
+  api
+    .delete<{ removed: number }>(`/profiles/${profile_id}/staff/remove-group/${group_id}`)
+    .then((r) => r.data);
+
 export const updateProfileStaff = (profile_id: number, staff_id: number, excluded: boolean) =>
   api
     .patch<ProfileStaffEntry>(`/profiles/${profile_id}/staff/${staff_id}`, { excluded })
@@ -86,6 +91,11 @@ export const addProfileShift = (profile_id: number, shift_id: number) =>
 
 export const addProfileShiftGroup = (profile_id: number, group_id: number) =>
   api.post(`/profiles/${profile_id}/shifts/add-group/${group_id}`).then(() => undefined);
+
+export const removeProfileShiftGroup = (profile_id: number, group_id: number) =>
+  api
+    .delete<{ removed: number }>(`/profiles/${profile_id}/shifts/remove-group/${group_id}`)
+    .then((r) => r.data);
 
 export const removeProfileShift = (profile_id: number, shift_id: number) =>
   api.delete(`/profiles/${profile_id}/shifts/${shift_id}`).then(() => undefined);

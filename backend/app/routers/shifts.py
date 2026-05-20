@@ -19,7 +19,7 @@ router = APIRouter(prefix="/shifts", tags=["Shifts"])
 def list_shift_groups(db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return db.query(ShiftGroup).order_by(ShiftGroup.code).all()
+    return db.query(ShiftGroup).order_by(ShiftGroup.is_work_shift.desc(), ShiftGroup.code).all()
 
 
 @router.post("/groups", response_model=ShiftGroupOut, status_code=status.HTTP_201_CREATED)

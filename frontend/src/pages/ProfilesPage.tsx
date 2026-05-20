@@ -16,7 +16,7 @@ import ProfileStaffTab from "../components/profiles/ProfileStaffTab";
 import ProfileSolverTab from "../components/profiles/ProfileSolverTab";
 import ProfileRulesTab from "../components/profiles/ProfileRulesTab";
 
-const TABS = ["Basics", "Shifts", "Staff", "Solver", "Rules"] as const;
+const TABS = ["Shifts", "Staff", "Config", "Rules"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function ProfilesPage() {
@@ -73,14 +73,74 @@ function ProfileCard({ profile, onEdit }: { profile: Profile; onEdit: () => void
     onError: (e) => toast(errorMessage(e, "Delete failed"), "error"),
   });
 
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(profile.name);
+  const renameMut = useMutation({
+    mutationFn: () => updateProfile(profile.id, { name: nameDraft.trim() }),
+    onSuccess: () => {
+      toast("Renamed", "success");
+      setRenaming(false);
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      qc.invalidateQueries({ queryKey: ["profile", profile.id] });
+    },
+    onError: (e) => toast(errorMessage(e, "Rename failed"), "error"),
+  });
+  function startRename() {
+    setNameDraft(profile.name);
+    setRenaming(true);
+  }
+
   const cfg = profile.config ?? {};
   const ruleCount = (cfg.conditional_constraints ?? []).length;
+  const canSaveRename =
+    !renameMut.isPending && !!nameDraft.trim() && nameDraft.trim() !== profile.name;
 
   return (
     <div className="card">
       <div className="card-header-row">
         <div>
-          <div style={{ fontSize: "var(--fs-lg)", fontWeight: 500 }}>{profile.name}</div>
+          {renaming ? (
+            <div className="row" style={{ gap: 8, alignItems: "center" }}>
+              <input
+                className="input"
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canSaveRename) renameMut.mutate();
+                  if (e.key === "Escape") setRenaming(false);
+                }}
+                style={{ width: 240, fontSize: "var(--fs-lg)", fontWeight: 500 }}
+              />
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => renameMut.mutate()}
+                disabled={!canSaveRename}
+              >
+                {renameMut.isPending ? "Saving…" : "Save"}
+              </button>
+              <button
+                className="btn btn-sm btn-ghost"
+                onClick={() => setRenaming(false)}
+                disabled={renameMut.isPending}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: "var(--fs-lg)", fontWeight: 500 }}>{profile.name}</span>
+              <button
+                className="btn btn-sm btn-ghost"
+                aria-label="Rename profile"
+                title="Rename"
+                onClick={startRename}
+                style={{ padding: "2px 6px" }}
+              >
+                ✎
+              </button>
+            </div>
+          )}
           <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: 4 }}>
             time_limit {cfg.time_limit ?? 600}s · overstaff w{cfg.weight_overstaff ?? 20} · consec w{cfg.weight_consec ?? 100} · {ruleCount} rule{ruleCount === 1 ? "" : "s"}
           </div>
@@ -155,8 +215,8 @@ function CreateProfileModal({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function EditProfileModal({ profile, onClose }: { profile: Profile; onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>("Basics");
-  // Refetch the profile so updates to config (Solver/Rules tabs) reflect immediately.
+  const [tab, setTab] = useState<Tab>("Shifts");
+  // Refetch the profile so updates to config (Config/Rules tabs) reflect immediately.
   const profileQ = useQuery({
     queryKey: ["profile", profile.id],
     queryFn: () => listProfiles().then((all) => all.find((p) => p.id === profile.id) ?? profile),
@@ -193,52 +253,10 @@ function EditProfileModal({ profile, onClose }: { profile: Profile; onClose: () 
         ))}
       </div>
 
-      {tab === "Basics" && <ProfileBasicsTab profile={current} />}
       {tab === "Shifts" && <ProfileShiftsTab profile={current} />}
       {tab === "Staff" && <ProfileStaffTab profile={current} />}
-      {tab === "Solver" && <ProfileSolverTab profile={current} />}
+      {tab === "Config" && <ProfileSolverTab profile={current} />}
       {tab === "Rules" && <ProfileRulesTab profile={current} />}
     </Modal>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ProfileBasicsTab({ profile }: { profile: Profile }) {
-  const qc = useQueryClient();
-  const { toast } = useToast();
-  const [name, setName] = useState(profile.name);
-  const [dirty, setDirty] = useState(false);
-
-  const mut = useMutation({
-    mutationFn: () => updateProfile(profile.id, { name }),
-    onSuccess: () => {
-      toast("Saved", "success");
-      setDirty(false);
-      qc.invalidateQueries({ queryKey: ["profiles"] });
-      qc.invalidateQueries({ queryKey: ["profile", profile.id] });
-    },
-    onError: (e) => toast(errorMessage(e, "Save failed"), "error"),
-  });
-
-  return (
-    <div className="stack">
-      <div className="field">
-        <label className="label">Profile name</label>
-        <input
-          className="input"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setDirty(true);
-          }}
-        />
-      </div>
-      <div className="row-end">
-        <button className="btn btn-primary" onClick={() => mut.mutate()} disabled={!dirty || mut.isPending}>
-          {mut.isPending ? "Saving…" : "Save"}
-        </button>
-      </div>
-    </div>
   );
 }

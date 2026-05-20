@@ -119,7 +119,7 @@ export default function ProfileRulesTab({ profile }: { profile: Profile }) {
       ))}
 
       <div className="row-end" style={{ gap: 8 }}>
-        <button className="btn" onClick={add}>+ Add Rule</button>
+        <button className="btn btn-primary" onClick={add}>+ Add Rule</button>
         <button className="btn btn-primary" onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
           {save.isPending ? "Saving…" : dirty ? "Save rules" : "Saved"}
         </button>

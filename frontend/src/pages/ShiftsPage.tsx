@@ -18,6 +18,7 @@ import { errorMessage } from "../api/client";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
 import { hhmmToMin, minToHHMM, durationMin } from "../lib/time";
+import { useCollapsed } from "../lib/useCollapsed";
 
 export default function ShiftsPage() {
   const groupsQ = useQuery({ queryKey: ["shifts", "groups"], queryFn: listShiftGroups });
@@ -97,6 +98,8 @@ function GroupCard({
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [collapsed, setCollapsed] = useCollapsed(`roster-engine.collapsed.shift-group.${group.id}`);
+  const bodyId = `shift-group-body-${group.id}`;
   const del = useMutation({
     mutationFn: () => deleteShiftGroup(group.id),
     onSuccess: () => {
@@ -117,73 +120,107 @@ function GroupCard({
   return (
     <div className="card">
       <div className="card-header-row">
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span className="mono" style={{ fontSize: 18, fontWeight: 600 }}>{group.code}</span>
-            {group.is_work_shift && <span className="badge badge-running">Work</span>}
-            {group.is_night_shift && <span className="badge badge-failed">Night</span>}
-            {!group.is_work_shift && <span className="badge badge-draft">Non-work</span>}
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          aria-expanded={!collapsed}
+          aria-controls={bodyId}
+          style={{
+            background: "none",
+            border: 0,
+            padding: 0,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            font: "inherit",
+            color: "inherit",
+            textAlign: "left",
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          <span style={{ fontSize: 14, width: 12, display: "inline-block" }}>
+            {collapsed ? "▸" : "▾"}
+          </span>
+          <span className="mono" style={{ fontSize: 18, fontWeight: 600 }}>{group.code}</span>
+          {group.is_work_shift && <span className="badge badge-running">Work</span>}
+          {group.is_night_shift && <span className="badge badge-failed">Night</span>}
+          {!group.is_work_shift && <span className="badge badge-draft">Non-work</span>}
+          <span className="muted">({shifts.length} {shifts.length === 1 ? "shift" : "shifts"})</span>
+        </button>
         <div className="row-end">
-          <button className="btn btn-sm" onClick={onAddShift}>+ Shift</button>
-          <button
-            className="btn btn-sm btn-danger"
-            onClick={() => {
-              if (confirm(`Delete group ${group.code}?`)) del.mutate();
-            }}
-            disabled={del.isPending}
-          >
-            Delete
-          </button>
+          <button className="btn btn-sm btn-primary" onClick={onAddShift}>+ Shift</button>
+          {group.code !== "Leaves" && (
+            <button
+              className="btn btn-sm btn-danger"
+              onClick={() => {
+                if (confirm(`Delete group ${group.code}?`)) del.mutate();
+              }}
+              disabled={del.isPending}
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
-      {shifts.length === 0 ? (
-        <div className="empty-state" style={{ marginTop: 16 }}>No shifts in this group yet.</div>
-      ) : (
-        <div style={{ marginTop: 16, overflowX: "auto" }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Work</th>
-                <th>Break</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {shifts.map((s) => (
-                <tr key={s.id}>
-                  <td className="mono">{s.code}</td>
-                  <td>{s.name}</td>
-                  <td className="mono">{minToHHMM(s.start_min)}</td>
-                  <td className="mono">
-                    {minToHHMM(s.end_min)}
-                    {s.end_min <= s.start_min && (
-                      <span className="muted" style={{ marginLeft: 6 }}>+1d</span>
-                    )}
-                  </td>
-                  <td className="mono">{(s.work_min / 60).toFixed(2)}h</td>
-                  <td className="mono">{s.break_min}m</td>
-                  <td className="row-end">
-                    <button className="btn btn-sm" onClick={() => onEditShift(s)}>Edit</button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => {
-                        if (confirm(`Delete shift ${s.code}?`)) delShift.mutate(s.id);
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {!collapsed && (
+        <div id={bodyId} role="region">
+          {shifts.length === 0 ? (
+            <div className="empty-state" style={{ marginTop: 16 }}>No shifts in this group yet.</div>
+          ) : (
+            <div style={{ marginTop: 16, overflowX: "auto" }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Work</th>
+                    <th>Break</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shifts.map((s) => (
+                    <tr key={s.id}>
+                      <td className="mono">{s.code}</td>
+                      <td>{s.name}</td>
+                      <td className="mono">{minToHHMM(s.start_min)}</td>
+                      <td className="mono">
+                        {minToHHMM(s.end_min)}
+                        {s.end_min <= s.start_min && (
+                          <span className="muted" style={{ marginLeft: 6 }}>+1d</span>
+                        )}
+                      </td>
+                      <td className="mono">{(s.work_min / 60).toFixed(2)}h</td>
+                      <td className="mono">{s.break_min}m</td>
+                      <td className="row-end">
+                        <button
+                          className="btn btn-sm"
+                          aria-label="Edit"
+                          title="Edit"
+                          onClick={() => onEditShift(s)}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => {
+                            if (confirm(`Delete shift ${s.code}?`)) delShift.mutate(s.id);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -343,6 +343,8 @@ input, select, textarea { font-family: inherit; }
 }
 
 .field + .field { margin-top: var(--s-4); }
+.grid-2 > .field + .field,
+.grid-3 > .field + .field { margin-top: 0; }
 
 .label {
   font-size: var(--fs-sm);

@@ -12,9 +12,28 @@ interface Props {
   onSelectDay?: (date: string) => void;
   /** When user has confirmed a range selection, this fires with {from, to}. */
   onSelectRange?: (from: string, to: string) => void;
+  /** "rostered" (default) only allows clicking approved/draft days; "all" allows any day. */
+  selectableDays?: "rostered" | "all";
+  /** Action button label when one day is selected. */
+  dayActionLabel?: string;
+  /** Action button label when a range is selected. */
+  rangeActionLabel?: string;
+  /** Override the hint text under the header. */
+  hint?: string;
 }
 
-export default function Calendar({ rosters, onSelectDay, onSelectRange }: Props) {
+const DEFAULT_HINT =
+  "Click an approved or draft date to start a selection. Click a second date to extend it. Click a third to reset.";
+
+export default function Calendar({
+  rosters,
+  onSelectDay,
+  onSelectRange,
+  selectableDays = "rostered",
+  dayActionLabel = "View day timetable",
+  rangeActionLabel = "View range timetable",
+  hint = DEFAULT_HINT,
+}: Props) {
   const today = new Date();
   const latestApproved = useMemo(
     () =>
@@ -111,7 +130,7 @@ export default function Calendar({ rosters, onSelectDay, onSelectRange }: Props)
                     clearSelection();
                   }}
                 >
-                  View range timetable
+                  {rangeActionLabel}
                 </button>
               ) : (
                 from && (
@@ -122,7 +141,7 @@ export default function Calendar({ rosters, onSelectDay, onSelectRange }: Props)
                       clearSelection();
                     }}
                   >
-                    View day timetable
+                    {dayActionLabel}
                   </button>
                 )
               )}
@@ -133,7 +152,7 @@ export default function Calendar({ rosters, onSelectDay, onSelectRange }: Props)
       </div>
 
       <p className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 12 }}>
-        Click an approved or draft date to start a selection. Click a second date to extend it. Click a third to reset.
+        {hint}
       </p>
 
       <div
@@ -169,11 +188,12 @@ export default function Calendar({ rosters, onSelectDay, onSelectRange }: Props)
               ds={ds}
               status={dayStatus.get(ds)?.status ?? "none"}
               count={dayStatus.get(ds)?.rosters.length ?? 0}
+              selectable={selectableDays === "all" || (dayStatus.get(ds)?.status ?? "none") !== "none"}
               selected={isInSelection(ds)}
               isEndpoint={ds === selStart || ds === selEnd}
               onClick={() => {
                 const status = dayStatus.get(ds)?.status ?? "none";
-                if (status === "none") return;
+                if (selectableDays === "rostered" && status === "none") return;
                 handleClick(ds);
               }}
             />
@@ -188,6 +208,7 @@ function CalCell({
   ds,
   status,
   count,
+  selectable,
   selected,
   isEndpoint,
   onClick,
@@ -195,12 +216,12 @@ function CalCell({
   ds: string;
   status: "approved" | "draft" | "none";
   count: number;
+  selectable: boolean;
   selected: boolean;
   isEndpoint: boolean;
   onClick: () => void;
 }) {
   const day = Number(ds.slice(8));
-  const selectable = status !== "none";
 
   const bg =
     status === "approved" ? "var(--status-approved-bg)"

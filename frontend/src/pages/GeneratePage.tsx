@@ -9,7 +9,9 @@ import { listSkillTypes } from "../api/skills";
 import { createDemand, DemandInput } from "../api/demands";
 import { errorMessage } from "../api/client";
 import { useToast } from "../components/Toast";
+import Calendar from "../components/Calendar";
 import { hhmmToMin } from "../lib/time";
+import { addDaysIso, dateRange, isoDate, pickRosterForDate } from "../lib/calendar";
 
 interface DemandDraft {
   start: string;
@@ -20,22 +22,6 @@ interface DemandDraft {
 
 function emptyDemand(): DemandDraft {
   return { start: "08:00", end: "20:00", headcount: 1, skill_value_id: null };
-}
-
-function isoDate(d: Date): string {
-  // Use local components — toISOString() converts to UTC and shifts dates
-  // by 1 day in non-UTC timezones.
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${dd}`;
-}
-
-function addDays(date: string, n: number): string {
-  const [y, m, d] = date.split("-").map(Number);
-  const out = new Date(y, m - 1, d);
-  out.setDate(out.getDate() + n);
-  return isoDate(out);
 }
 
 export default function GeneratePage() {
@@ -60,10 +46,9 @@ export default function GeneratePage() {
   const [rosterStart, setRosterStart] = useState<string>(isoDate(new Date()));
   const [numDays, setNumDays] = useState(7);
   const [targetWorkHours, setTargetWorkHours] = useState(40);
-  const [previousRosterId, setPreviousRosterId] = useState<number | "none">("none");
 
   const dates = useMemo(
-    () => Array.from({ length: Math.max(numDays, 0) }, (_, i) => addDays(rosterStart, i)),
+    () => Array.from({ length: Math.max(numDays, 0) }, (_, i) => addDaysIso(rosterStart, i)),
     [rosterStart, numDays],
   );
 
@@ -149,6 +134,7 @@ export default function GeneratePage() {
         demand_ids.push(created.id);
       }
       // 2) Create the roster.
+      const prev = pickRosterForDate(rostersQ.data ?? [], addDaysIso(rosterStart, -1));
       const roster = await createRoster({
         profile_id: profileId,
         name: name.trim(),
@@ -156,7 +142,7 @@ export default function GeneratePage() {
         num_days: numDays,
         target_work_min: Math.round(targetWorkHours * 60),
         demand_ids,
-        previous_roster_id: previousRosterId === "none" ? null : previousRosterId,
+        previous_roster_id: prev?.id ?? null,
       });
       return roster;
     },
@@ -214,29 +200,32 @@ export default function GeneratePage() {
         </Step>
 
         <Step n={2} title="Date range & target hours">
-          <div className="grid-3">
-            <div className="field">
-              <label className="label">Roster start</label>
-              <input
-                type="date"
-                className="input"
-                value={rosterStart}
-                onChange={(e) => setRosterStart(e.target.value)}
-                required
-              />
-            </div>
-            <div className="field">
-              <label className="label">Number of days</label>
-              <input
-                type="number"
-                min={1}
-                className="input mono"
-                value={numDays}
-                onChange={(e) => setNumDays(Math.max(1, parseInt(e.target.value || "1", 10)))}
-                required
-              />
-            </div>
-            <div className="field">
+          <Calendar
+            rosters={rostersQ.data ?? []}
+            selectableDays="all"
+            dayActionLabel="Use this day"
+            rangeActionLabel="Use this range"
+            hint="Click a date to start, click a second to extend a range. The chosen window becomes the roster start + length. Chaining from an approved roster covering the day before is automatic."
+            onSelectDay={(d) => {
+              setRosterStart(d);
+              setNumDays(1);
+            }}
+            onSelectRange={(from, to) => {
+              setRosterStart(from);
+              setNumDays(dateRange(from, to).length);
+            }}
+          />
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", marginTop: 12, alignItems: "flex-end", gap: 16 }}
+          >
+            <span className="muted" style={{ fontSize: "var(--fs-sm)" }}>
+              Window: <span className="mono">{rosterStart}</span> →{" "}
+              <span className="mono">{addDaysIso(rosterStart, numDays - 1)}</span>
+              {" · "}
+              {numDays} day{numDays === 1 ? "" : "s"}
+            </span>
+            <div className="field" style={{ width: 200 }}>
               <label className="label">Target hours per staff</label>
               <input
                 type="number"
@@ -249,29 +238,6 @@ export default function GeneratePage() {
               />
               <span className="field-hint">Sent as target_work_min = hours × 60.</span>
             </div>
-          </div>
-          <div className="field" style={{ marginTop: 12 }}>
-            <label className="label">Chain from previous roster</label>
-            <select
-              className="select"
-              value={previousRosterId}
-              onChange={(e) =>
-                setPreviousRosterId(e.target.value === "none" ? "none" : Number(e.target.value))
-              }
-              style={{ maxWidth: 480 }}
-            >
-              <option value="none">No chaining — start fresh</option>
-              {rostersQ.data
-                ?.filter((r) => r.status === "approved" || r.status === "draft")
-                .map((r) => (
-                  <option key={r.id} value={r.id}>
-                    #{r.id} {r.name} ({r.roster_start})
-                  </option>
-                ))}
-            </select>
-            <span className="field-hint">
-              Enables ConditionalConstraint rules to look back into the previous roster's last days.
-            </span>
           </div>
         </Step>
 
@@ -320,7 +286,7 @@ export default function GeneratePage() {
               <div key={d} className="card" style={{ padding: 16 }}>
                 <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
                   <span className="mono" style={{ fontWeight: 600 }}>{d}</span>
-                  <button className="btn btn-sm" onClick={() => addDemand(d)}>+ Demand</button>
+                  <button className="btn btn-sm btn-primary" onClick={() => addDemand(d)}>+ Demand</button>
                 </div>
                 {(demands[d] ?? []).length === 0 ? (
                   <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>No demands.</div>

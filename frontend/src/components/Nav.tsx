@@ -16,6 +16,8 @@ export default function Nav() {
         <div className="nav-links">
           <NavTab to="/shifts" label="Shifts" />
           <NavTab to="/staff" label="Staff" />
+          <NavTab to="/skills" label="Skills" />
+          <NavTab to="/leaves" label="Leaves" />
           <NavTab to="/profiles" label="Profiles" />
           <NavTab to="/generate" label="Generate" />
           <NavTab to="/rosters" label="Rosters" />

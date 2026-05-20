@@ -5,7 +5,10 @@ import path from "node:path";
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), "");
-    const proxyTarget = env.VITE_PROXY_TARGET || "http://backend:8000";
+    // process.env wins over .env files so a docker-compose `environment:` value
+    // overrides the bind-mounted .env.development (which targets localhost for
+    // host-side dev).
+    const proxyTarget = process.env.VITE_PROXY_TARGET || env.VITE_PROXY_TARGET || "http://backend:8000";
     return {
         plugins: [react()],
         resolve: {

@@ -132,6 +132,28 @@ def add_staff_group_to_profile(profile_id: int, group_id: int, db: Session = Dep
     return {"added": added}
 
 
+@router.delete("/{profile_id}/staff/remove-group/{group_id}")
+def remove_staff_group_from_profile(profile_id: int, group_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bulk-remove every staff member in a staff group from the profile."""
+    if not db.get(Profile, profile_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
+    group = db.get(StaffGroup, group_id)
+    if not group:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff group not found.")
+    staff_ids = [s.id for s in group.staff]
+    if not staff_ids:
+        return {"removed": 0}
+    removed = (
+        db.query(ProfileStaff)
+        .filter(ProfileStaff.profile_id == profile_id, ProfileStaff.staff_id.in_(staff_ids))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"removed": removed}
+
+
 @router.patch("/{profile_id}/staff/{staff_id}", response_model=ProfileStaffOut)
 def update_profile_staff(
     profile_id: int, staff_id: int, body: ProfileStaffUpdate, db: Session = Depends(get_db),
@@ -205,6 +227,28 @@ def add_shift_group_to_profile(profile_id: int, group_id: int, db: Session = Dep
             added += 1
     db.commit()
     return {"added": added}
+
+
+@router.delete("/{profile_id}/shifts/remove-group/{group_id}")
+def remove_shift_group_from_profile(profile_id: int, group_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bulk-remove every shift in a shift group from the profile."""
+    if not db.get(Profile, profile_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
+    group = db.get(ShiftGroup, group_id)
+    if not group:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Shift group not found.")
+    shift_ids = [s.id for s in group.shifts]
+    if not shift_ids:
+        return {"removed": 0}
+    removed = (
+        db.query(ProfileShift)
+        .filter(ProfileShift.profile_id == profile_id, ProfileShift.shift_id.in_(shift_ids))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"removed": removed}
 
 
 @router.delete("/{profile_id}/shifts/{shift_id}", status_code=status.HTTP_204_NO_CONTENT)

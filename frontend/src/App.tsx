@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import RostersPage from "./pages/RostersPage";
 import ShiftsPage from "./pages/ShiftsPage";
 import StaffPage from "./pages/StaffPage";
+import SkillsPage from "./pages/SkillsPage";
+import LeavesPage from "./pages/LeavesPage";
 import ProfilesPage from "./pages/ProfilesPage";
 import GeneratePage from "./pages/GeneratePage";
 import LoginPage from "./pages/LoginPage";
@@ -26,6 +28,8 @@ export default function App() {
               <Route path="/rosters" element={<RequireAuth><RostersPage /></RequireAuth>} />
               <Route path="/shifts" element={<RequireAuth><ShiftsPage /></RequireAuth>} />
               <Route path="/staff" element={<RequireAuth><StaffPage /></RequireAuth>} />
+              <Route path="/skills" element={<RequireAuth><SkillsPage /></RequireAuth>} />
+              <Route path="/leaves" element={<RequireAuth><LeavesPage /></RequireAuth>} />
               <Route path="/profiles" element={<RequireAuth><ProfilesPage /></RequireAuth>} />
               <Route path="/generate" element={<RequireAuth><GeneratePage /></RequireAuth>} />
               <Route path="*" element={<NotFound />} />
