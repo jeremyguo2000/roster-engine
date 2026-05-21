@@ -201,46 +201,43 @@ class RosterEngine:
     
     def build_pre_assignments_for_leaves(
         self,
-        leaves:       list[tuple[str, date]],
+        leaves:       list[tuple[str, date, str]],
         roster_start: date,
-        num_days:     int, 
-        shift_code:   str = "AL",
+        num_days:     int,
     ) -> list[tuple[int, int, int]]:
         """
-        Convert a list of (employee_id, leave_date) tuples into pre_assignment
-        index tuples (n, d, s) for use in generate_roster().
- 
+        Convert a list of (employee_id, leave_date, shift_code) tuples into
+        pre_assignment index tuples (n, d, s) for use in generate_roster().
+
         Leave dates that fall outside the roster window [0, num_days) are
         silently skipped. Raises ValueError if a staff name or shift code
         is not found.
- 
+
         Parameters
         ----------
-        leaves       : List of (employee_id, leave_date) tuples.
+        leaves       : List of (employee_id, leave_date, shift_code) tuples.
         roster_start : The roster start date used to compute day index d.
-        shift_code   : Shift code to assign. Defaults to "AL".
- 
+
         Returns
         -------
         List of (n, d, s) index tuples ready to pass to generate_roster().
         """
         staff_index = {staff.employee_id: n for n, staff in enumerate(self.staff_list)}
         shift_index = {shift.code: s for s, shift in enumerate(self.shifts)}
- 
-        if shift_code not in shift_index:
-            raise ValueError(f"Shift '{shift_code}' not found")
- 
-        s = shift_index[shift_code]
+
         pre_assignments = []
- 
-        for employee_id, leave_date in leaves:
+
+        for employee_id, leave_date, shift_code in leaves:
             n = staff_index.get(employee_id)
             if n is None:
                 raise ValueError(f"Staff '{employee_id}' not found")
+            s = shift_index.get(shift_code)
+            if s is None:
+                raise ValueError(f"Shift '{shift_code}' not found")
             d = (leave_date - roster_start).days
             if 0 <= d < num_days:
                 pre_assignments.append((n, d, s))
- 
+
         return pre_assignments
     
  

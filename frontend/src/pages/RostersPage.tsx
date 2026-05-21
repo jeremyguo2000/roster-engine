@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Roster,
   approveRoster,
+  deleteRoster,
   discardRoster,
   getRoster,
   listRosters,
@@ -301,22 +302,26 @@ function ApproveButton({ roster, onAfter }: { roster: Roster; onAfter?: () => vo
 function DiscardButton({ roster, onAfter }: { roster: Roster; onAfter?: () => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const isApproved = roster.status === "approved";
   const mut = useMutation({
-    mutationFn: () => discardRoster(roster.id),
+    mutationFn: () => (isApproved ? deleteRoster(roster.id) : discardRoster(roster.id)),
     onSuccess: () => {
-      toast(`${roster.name} discarded`, "success");
+      toast(`${roster.name} ${isApproved ? "deleted" : "discarded"}`, "success");
       qc.invalidateQueries({ queryKey: ["rosters"] });
       onAfter?.();
     },
-    onError: (e) => toast(errorMessage(e, "Discard failed"), "error"),
+    onError: (e) => toast(errorMessage(e, isApproved ? "Delete failed" : "Discard failed"), "error"),
   });
+  const confirmMsg = isApproved
+    ? `${roster.name} is approved. Permanently delete? This cannot be undone.`
+    : `Discard ${roster.name}?`;
   return (
     <button
       className="btn btn-sm btn-danger"
-      onClick={() => confirm(`Discard ${roster.name}?`) && mut.mutate()}
+      onClick={() => confirm(confirmMsg) && mut.mutate()}
       disabled={mut.isPending}
     >
-      {roster.status === "approved" ? "Delete" : "Discard"}
+      {isApproved ? "Delete" : "Discard"}
     </button>
   );
 }

@@ -125,7 +125,7 @@ def _build_solver_inputs(db, roster: Roster):
     )
     staff_id_to_employee_id = {s.id: s.employee_id for s in staff_db_list}
     leave_tuples = [
-        (staff_id_to_employee_id[lv.staff_id], lv.date)
+        (staff_id_to_employee_id[lv.staff_id], lv.date, lv.shift_code)
         for lv in leaves_db
         if lv.staff_id in staff_id_to_employee_id
     ]
@@ -287,7 +287,6 @@ def run_solver(self, roster_id: int, time_limit: int = 600, previous_roster_id: 
                 leaves=leave_tuples,
                 roster_start=roster.roster_start,
                 num_days=roster.num_days,
-                shift_code="AL",
             )
  
         # Build roster context from previous roster, if provided
