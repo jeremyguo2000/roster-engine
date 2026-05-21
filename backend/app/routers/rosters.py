@@ -5,13 +5,13 @@ from datetime import timedelta
 from app.database import get_db
 from app.models import Roster, RosterStatus, RosterDemand, Demand, Profile, Leave, User
 from app.dependencies.auth import get_current_user
-from app.schemas.roster import RosterCreate, RosterOut, DemandOut
+from app.schemas.roster import RosterListItem, RosterCreate, RosterOut, DemandOut
 from app.worker.tasks import run_solver
 
 router = APIRouter(prefix="/rosters", tags=["Rosters"])
 
 
-@router.get("", response_model=list[RosterOut])
+@router.get("", response_model=list[RosterListItem])
 def list_rosters(
     status: RosterStatus | None = None,
     profile_id: int | None = None,
