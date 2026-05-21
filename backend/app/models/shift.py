@@ -11,6 +11,7 @@ class ShiftGroup(Base):
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     is_work_shift: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_night_shift: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    color: Mapped[str] = mapped_column(String, nullable=False, default="#8A8378")
 
     shifts: Mapped[list["Shift"]] = relationship(
         "Shift", back_populates="group", cascade="all, delete-orphan"

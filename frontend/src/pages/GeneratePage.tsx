@@ -21,7 +21,7 @@ interface DemandDraft {
 }
 
 function emptyDemand(): DemandDraft {
-  return { start: "08:00", end: "20:00", headcount: 1, skill_value_id: null };
+  return { start: "00:00", end: "00:00", headcount: 1, skill_value_id: null };
 }
 
 export default function GeneratePage() {
@@ -44,8 +44,31 @@ export default function GeneratePage() {
 
   // Step 2 — range + target work
   const [rosterStart, setRosterStart] = useState<string>(isoDate(new Date()));
-  const [numDays, setNumDays] = useState(7);
+  const [numDays, setNumDays] = useState(1);
   const [targetWorkHours, setTargetWorkHours] = useState(40);
+  const [startInitialised, setStartInitialised] = useState(false);
+
+  useEffect(() => {
+    if (startInitialised) return;
+    if (rostersQ.isError) {
+      setStartInitialised(true);
+      return;
+    }
+    if (!rostersQ.data) return;
+    const today = isoDate(new Date());
+    const approved = rostersQ.data.filter((r) => r.status === "approved");
+    if (approved.length > 0) {
+      const latestEnd = approved
+        .map((r) => addDaysIso(r.roster_start, r.num_days - 1))
+        .sort()
+        .at(-1)!;
+      const nextAvailable = addDaysIso(latestEnd, 1);
+      if (nextAvailable > today) {
+        setRosterStart(nextAvailable);
+      }
+    }
+    setStartInitialised(true);
+  }, [rostersQ.data, rostersQ.isError, startInitialised]);
 
   const dates = useMemo(
     () => Array.from({ length: Math.max(numDays, 0) }, (_, i) => addDaysIso(rosterStart, i)),
@@ -168,6 +191,13 @@ export default function GeneratePage() {
           <h1 className="page-title">Generate Roster</h1>
           <p className="page-sub">Configure the solver inputs, then dispatch.</p>
         </div>
+        <button
+          className="btn btn-primary btn-lg"
+          onClick={() => generate.mutate()}
+          disabled={!formValid || generate.isPending}
+        >
+          {generate.isPending ? "Generating…" : "Generate"}
+        </button>
       </div>
 
       <div className="stack">
@@ -199,6 +229,8 @@ export default function GeneratePage() {
           </div>
         </Step>
 
+        {startInitialised ? (
+        <>
         <Step n={2} title="Date range & target hours">
           <Calendar
             rosters={rostersQ.data ?? []}
@@ -206,6 +238,11 @@ export default function GeneratePage() {
             dayActionLabel="Use this day"
             rangeActionLabel="Use this range"
             hint="Click a date to start, click a second to extend a range. The chosen window becomes the roster start + length. Chaining from an approved roster covering the day before is automatic."
+            committedRange={
+              rosterStart && numDays > 0
+                ? { from: rosterStart, to: addDaysIso(rosterStart, numDays - 1) }
+                : null
+            }
             onSelectDay={(d) => {
               setRosterStart(d);
               setNumDays(1);
@@ -236,7 +273,6 @@ export default function GeneratePage() {
                 onChange={(e) => setTargetWorkHours(Math.max(0, parseFloat(e.target.value || "0")))}
                 required
               />
-              <span className="field-hint">Sent as target_work_min = hours × 60.</span>
             </div>
           </div>
         </Step>
@@ -297,6 +333,7 @@ export default function GeneratePage() {
                         <div className="field" style={{ width: 110 }}>
                           <label className="label">Start</label>
                           <input
+                            type="time"
                             className="input mono"
                             value={dem.start}
                             onChange={(e) => updateDemand(d, i, { start: e.target.value })}
@@ -305,6 +342,7 @@ export default function GeneratePage() {
                         <div className="field" style={{ width: 110 }}>
                           <label className="label">End</label>
                           <input
+                            type="time"
                             className="input mono"
                             value={dem.end}
                             onChange={(e) => updateDemand(d, i, { end: e.target.value })}
@@ -347,25 +385,19 @@ export default function GeneratePage() {
           </div>
         </Step>
 
-        <Step n={5} title="Generate">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <span className="muted" style={{ fontSize: "var(--fs-sm)" }}>
-              {allDemandRows.length} demand{allDemandRows.length === 1 ? "" : "s"} across {dates.length} day{dates.length === 1 ? "" : "s"}
-              {!formValid && " — fill all required fields and add ≥ 1 demand."}
-            </span>
-            <button
-              className="btn btn-primary btn-lg"
-              onClick={() => generate.mutate()}
-              disabled={!formValid || generate.isPending}
-            >
-              {generate.isPending ? "Dispatching…" : "Run Solver"}
-            </button>
-          </div>
-          <p className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 8 }}>
-            Demands are created first, then the roster is dispatched to Celery. You can leave this page —
-            the nav will show "Solving…" and a toast appears when it finishes.
-          </p>
-        </Step>
+        <div className="row" style={{ justifyContent: "flex-end" }}>
+          <button
+            className="btn btn-primary btn-lg"
+            onClick={() => generate.mutate()}
+            disabled={!formValid || generate.isPending}
+          >
+            {generate.isPending ? "Generating…" : "Generate"}
+          </button>
+        </div>
+        </>
+        ) : (
+          <div className="card empty-state">Loading…</div>
+        )}
       </div>
     </div>
   );

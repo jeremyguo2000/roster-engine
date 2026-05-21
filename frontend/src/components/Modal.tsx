@@ -5,8 +5,8 @@ interface ModalProps {
   onClose: () => void;
   title?: ReactNode;
   children: ReactNode;
-  /** "md" (560), "wide-md" (720) or "wide" (1200) */
-  size?: "md" | "wide-md" | "wide";
+  /** "md" (560), "wide-md" (720), "wide" (1200), or "full" (viewport minus 32px gutter) */
+  size?: "md" | "wide-md" | "wide" | "full";
 }
 
 export default function Modal({ open, onClose, title, children, size = "md" }: ModalProps) {
@@ -22,7 +22,13 @@ export default function Modal({ open, onClose, title, children, size = "md" }: M
   if (!open) return null;
 
   const boxClass =
-    size === "wide" ? "modal-box modal-wide" : size === "wide-md" ? "modal-box modal-md" : "modal-box";
+    size === "full"
+      ? "modal-box modal-full"
+      : size === "wide"
+        ? "modal-box modal-wide"
+        : size === "wide-md"
+          ? "modal-box modal-md"
+          : "modal-box";
 
   return (
     <div

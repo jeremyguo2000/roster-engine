@@ -5,6 +5,7 @@ class ShiftGroupBase(BaseModel):
     code: str
     is_work_shift: bool = True
     is_night_shift: bool = False
+    color: str = "#8A8378"
 
 class ShiftGroupCreate(ShiftGroupBase):
     pass
@@ -13,6 +14,7 @@ class ShiftGroupUpdate(BaseModel):
     code: str | None = None
     is_work_shift: bool | None = None
     is_night_shift: bool | None = None
+    color: str | None = None
 
 class ShiftGroupOut(ShiftGroupBase):
     id: int

@@ -32,6 +32,7 @@ export interface RosterResult {
   assignments: Record<string, Record<string, string>>;
   staff_max_consec?: Record<string, number>;
   max_consecutive?: number;
+  error?: string;
   [k: string]: unknown;
 }
 

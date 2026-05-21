@@ -105,19 +105,23 @@ export default function RostersPage() {
           <div className="empty-state">No approved rosters yet.</div>
         ) : (
           <div className="stack">
-            {approved.map((r) => <ApprovedCard key={r.id} roster={r} />)}
+            {approved.map((r) => (
+              <ApprovedCard key={r.id} roster={r} onView={() => setViewing(r)} />
+            ))}
           </div>
         )}
       </section>
 
       {viewing && (
-        <Modal open onClose={() => setViewing(null)} title={viewing.name} size="wide">
+        <Modal open onClose={() => setViewing(null)} title={viewing.name} size="full">
           {viewing.result ? (
             <>
               <RosterGrid result={viewing.result} />
               <RosterSummary result={viewing.result} />
               <div className="row-end" style={{ marginTop: 16 }}>
-                <ApproveButton roster={viewing} onAfter={() => setViewing(null)} />
+                {viewing.status === "draft" && (
+                  <ApproveButton roster={viewing} onAfter={() => setViewing(null)} />
+                )}
                 <DiscardButton roster={viewing} onAfter={() => setViewing(null)} />
               </div>
             </>
@@ -128,7 +132,7 @@ export default function RostersPage() {
       )}
 
       {dayView && rostersQ.data && (
-        <Modal open onClose={() => setDayView(null)} title={`Day Timetable — ${dayView}`} size="wide">
+        <Modal open onClose={() => setDayView(null)} title={`Day Timetable — ${dayView}`} size="full">
           <DayTimetable date={dayView} rosters={rostersQ.data} />
         </Modal>
       )}
@@ -137,7 +141,7 @@ export default function RostersPage() {
           open
           onClose={() => setRangeView(null)}
           title={`Timetable — ${rangeView.from} → ${rangeView.to}`}
-          size="wide"
+          size="full"
         >
           <RangeTimetable from={rangeView.from} to={rangeView.to} rosters={rostersQ.data} />
         </Modal>
@@ -191,9 +195,14 @@ function FailedCard({ roster }: { roster: Roster }) {
     <div className="card">
       <div className="card-header-row">
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: "var(--fs-lg)", fontWeight: 500 }}>{roster.name}</span>
             <span className="badge badge-failed">Failed</span>
+            {roster.result?.error && (
+              <span className="muted" style={{ fontSize: "var(--fs-sm)" }}>
+                {roster.result.error}
+              </span>
+            )}
           </div>
           <RosterMeta roster={roster} />
         </div>
@@ -226,8 +235,7 @@ function DraftCard({ roster, onView }: { roster: Roster; onView: () => void }) {
   );
 }
 
-function ApprovedCard({ roster }: { roster: Roster }) {
-  const [open, setOpen] = useState(false);
+function ApprovedCard({ roster, onView }: { roster: Roster; onView: () => void }) {
   return (
     <div className="card">
       <div className="card-header-row">
@@ -239,18 +247,10 @@ function ApprovedCard({ roster }: { roster: Roster }) {
           <RosterMeta roster={roster} />
         </div>
         <div className="row-end">
-          <button className="btn btn-sm" onClick={() => setOpen((v) => !v)}>
-            {open ? "▲ Hide" : "▼ Show"}
-          </button>
+          <button className="btn btn-sm" onClick={onView}>View</button>
           <DiscardButton roster={roster} />
         </div>
       </div>
-      {open && roster.result && (
-        <div style={{ marginTop: 16 }}>
-          <RosterGrid result={roster.result} />
-          <RosterSummary result={roster.result} />
-        </div>
-      )}
     </div>
   );
 }

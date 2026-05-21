@@ -13,10 +13,12 @@ import {
   listShiftGroups,
   listShifts,
   updateShift,
+  updateShiftGroup,
 } from "../api/shifts";
 import { errorMessage } from "../api/client";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
+import { CURATED_COLOURS } from "../lib/colours";
 import { hhmmToMin, minToHHMM, durationMin } from "../lib/time";
 import { useCollapsed } from "../lib/useCollapsed";
 
@@ -24,7 +26,7 @@ export default function ShiftsPage() {
   const groupsQ = useQuery({ queryKey: ["shifts", "groups"], queryFn: listShiftGroups });
   const shiftsQ = useQuery({ queryKey: ["shifts", "list"], queryFn: () => listShifts() });
 
-  const [addGroupOpen, setAddGroupOpen] = useState(false);
+  const [groupModal, setGroupModal] = useState<{ existing?: ShiftGroup } | null>(null);
   const [addShiftFor, setAddShiftFor] = useState<ShiftGroup | null>(null);
   const [editShift, setEditShift] = useState<Shift | null>(null);
 
@@ -35,7 +37,7 @@ export default function ShiftsPage() {
           <h1 className="page-title">Shifts</h1>
           <p className="page-sub">Shift groups and the shifts they contain.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setAddGroupOpen(true)}>
+        <button className="btn btn-primary" onClick={() => setGroupModal({})}>
           + Add Group
         </button>
       </div>
@@ -59,11 +61,17 @@ export default function ShiftsPage() {
             shifts={(shiftsQ.data ?? []).filter((s) => s.group_id === g.id)}
             onAddShift={() => setAddShiftFor(g)}
             onEditShift={setEditShift}
+            onEditGroup={() => setGroupModal({ existing: g })}
           />
         ))}
       </div>
 
-      <AddGroupModal open={addGroupOpen} onClose={() => setAddGroupOpen(false)} />
+      {groupModal && (
+        <GroupFormModal
+          existing={groupModal.existing}
+          onClose={() => setGroupModal(null)}
+        />
+      )}
       {addShiftFor && (
         <ShiftFormModal
           group={addShiftFor}
@@ -90,11 +98,13 @@ function GroupCard({
   shifts,
   onAddShift,
   onEditShift,
+  onEditGroup,
 }: {
   group: ShiftGroup;
   shifts: Shift[];
   onAddShift: () => void;
   onEditShift: (s: Shift) => void;
+  onEditGroup: () => void;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -144,12 +154,13 @@ function GroupCard({
             {collapsed ? "▸" : "▾"}
           </span>
           <span className="mono" style={{ fontSize: 18, fontWeight: 600 }}>{group.code}</span>
-          {group.is_work_shift && <span className="badge badge-running">Work</span>}
-          {group.is_night_shift && <span className="badge badge-failed">Night</span>}
-          {!group.is_work_shift && <span className="badge badge-draft">Non-work</span>}
+          {group.is_work_shift && <GroupPill label="Work" color={group.color} />}
+          {group.is_night_shift && <GroupPill label="Night" color={group.color} />}
+          {!group.is_work_shift && <GroupPill label="Non-work" color={group.color} />}
           <span className="muted">({shifts.length} {shifts.length === 1 ? "shift" : "shifts"})</span>
         </button>
         <div className="row-end">
+          <button className="btn btn-sm" onClick={onEditGroup}>Edit</button>
           <button className="btn btn-sm btn-primary" onClick={onAddShift}>+ Shift</button>
           {group.code !== "Leaves" && (
             <button
@@ -229,68 +240,177 @@ function GroupCard({
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function AddGroupModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function GroupPill({ label, color }: { label: string; color: string }) {
+  return (
+    <span className="badge" style={{ background: color + "1A", color }}>
+      {label}
+    </span>
+  );
+}
+
+const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+
+function ColorPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const isCurated = CURATED_COLOURS.some((c) => c.toLowerCase() === value.toLowerCase());
+  return (
+    <div className="field">
+      <label className="label">Colour</label>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {CURATED_COLOURS.map((c) => {
+          const selected = c.toLowerCase() === value.toLowerCase();
+          return (
+            <button
+              key={c}
+              type="button"
+              aria-label={`Use colour ${c}`}
+              onClick={() => onChange(c)}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: c,
+                border: selected ? "2px solid var(--ink)" : "2px solid transparent",
+                boxShadow: selected ? "inset 0 0 0 2px var(--surface)" : "none",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            />
+          );
+        })}
+        <label
+          aria-label="Pick a custom colour"
+          title="Pick a custom colour"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            cursor: "pointer",
+            position: "relative",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: isCurated ? "transparent" : value,
+            border: isCurated ? "2px dashed var(--border)" : "2px solid var(--ink)",
+            boxShadow: isCurated ? "none" : "inset 0 0 0 2px var(--surface)",
+            color: "var(--muted)",
+            fontSize: 16,
+            lineHeight: 1,
+          }}
+        >
+          {isCurated && <span aria-hidden="true">+</span>}
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0,
+              cursor: "pointer",
+              border: 0,
+              padding: 0,
+            }}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function GroupFormModal({
+  existing,
+  onClose,
+}: {
+  existing?: ShiftGroup;
+  onClose: () => void;
+}) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [form, setForm] = useState<ShiftGroupInput>({
-    code: "",
-    is_work_shift: true,
-    is_night_shift: false,
-  });
+  const isEdit = !!existing;
+  const colourOnly = !!existing && existing.code === "Leaves";
+  const [form, setForm] = useState<ShiftGroupInput>(
+    existing
+      ? {
+          code: existing.code,
+          is_work_shift: existing.is_work_shift,
+          is_night_shift: existing.is_night_shift,
+          color: existing.color,
+        }
+      : { code: "", is_work_shift: true, is_night_shift: false, color: CURATED_COLOURS[0] },
+  );
 
   const mut = useMutation({
-    mutationFn: () => createShiftGroup(form),
+    mutationFn: () =>
+      isEdit ? updateShiftGroup(existing!.id, form) : createShiftGroup(form),
     onSuccess: () => {
-      toast(`Group ${form.code} added`, "success");
+      toast(isEdit ? `Group ${form.code} updated` : `Group ${form.code} added`, "success");
       qc.invalidateQueries({ queryKey: ["shifts"] });
-      setForm({ code: "", is_work_shift: true, is_night_shift: false });
       onClose();
     },
-    onError: (e) => toast(errorMessage(e, "Create failed"), "error"),
+    onError: (e) => toast(errorMessage(e, isEdit ? "Update failed" : "Create failed"), "error"),
   });
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!form.color || !HEX_RE.test(form.color)) {
+      toast("Colour must be a #RRGGBB hex value", "error");
+      return;
+    }
     mut.mutate();
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Add Shift Group" size="md">
+    <Modal open onClose={onClose} title={isEdit ? "Edit Shift Group" : "Add Shift Group"} size="md">
       <form onSubmit={onSubmit} className="stack">
-        <div className="field">
-          <label className="label">Code</label>
-          <input
-            className="input mono"
-            autoFocus
-            value={form.code}
-            onChange={(e) => setForm({ ...form, code: e.target.value })}
-            placeholder="DSG / ESG / NSG / Off / Leaves …"
-            required
-          />
-          <span className="field-hint">Short code shown in the roster grid.</span>
-        </div>
-        <div className="field">
-          <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="checkbox"
-              checked={form.is_work_shift ?? true}
-              onChange={(e) => setForm({ ...form, is_work_shift: e.target.checked })}
-            />
-            <span>Counts as a work shift</span>
-          </label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="checkbox"
-              checked={form.is_night_shift ?? false}
-              onChange={(e) => setForm({ ...form, is_night_shift: e.target.checked })}
-            />
-            <span>Counts as a night shift (NSG burden)</span>
-          </label>
-        </div>
+        {!colourOnly && (
+          <>
+            <div className="field">
+              <label className="label">Code</label>
+              <input
+                className="input mono"
+                autoFocus
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value })}
+                placeholder="DSG / ESG / NSG / Off / Leaves …"
+                required
+              />
+            </div>
+            <div className="field">
+              <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={form.is_work_shift ?? true}
+                  onChange={(e) => setForm({ ...form, is_work_shift: e.target.checked })}
+                />
+                <span>Work Shifts</span>
+              </label>
+              <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={form.is_night_shift ?? false}
+                  onChange={(e) => setForm({ ...form, is_night_shift: e.target.checked })}
+                />
+                <span>Night Shifts</span>
+              </label>
+            </div>
+          </>
+        )}
+        <ColorPicker
+          value={form.color ?? CURATED_COLOURS[0]}
+          onChange={(c) => setForm({ ...form, color: c })}
+        />
         <div className="row-end">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn btn-primary" disabled={mut.isPending}>
-            {mut.isPending ? "Adding…" : "Add Group"}
+            {mut.isPending ? "Saving…" : isEdit ? "Save Changes" : "Add Group"}
           </button>
         </div>
       </form>

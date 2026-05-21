@@ -1,7 +1,9 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Roster } from "../api/rosters";
-import { groupColour } from "../lib/colours";
+import { listShiftGroups } from "../api/shifts";
+import { groupColour, groupColourFor } from "../lib/colours";
 import {
   DAY_WIN_START,
   fmtMin,
@@ -26,6 +28,11 @@ export default function RangeTimetable({
   const bars = useMemo(() => rangeTimetableBars(rosters, dates), [rosters, dates]);
   const order = useMemo(() => staffOrderFromBars(bars), [bars]);
   const winDur = rangeWindowDuration(dates.length);
+  const groupsQ = useQuery({ queryKey: ["shifts", "groups"], queryFn: listShiftGroups });
+  const colourOf = (code: string) => {
+    const g = groupsQ.data?.find((g) => g.code === code);
+    return g ? groupColourFor(g) : groupColour(code);
+  };
 
   // Separators + labels at midnight of each day in the window.
   const separators = useMemo(() => {
@@ -143,7 +150,7 @@ export default function RangeTimetable({
                         width: `${width}%`,
                         top: 2,
                         bottom: 2,
-                        background: groupColour(b.shift_info.group),
+                        background: colourOf(b.shift_info.group),
                         borderRadius: 2,
                       }}
                     />

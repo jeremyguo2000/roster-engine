@@ -1,7 +1,9 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Roster } from "../api/rosters";
-import { groupColour } from "../lib/colours";
+import { listShiftGroups } from "../api/shifts";
+import { groupColour, groupColourFor } from "../lib/colours";
 import {
   DAY_WIN_DUR,
   DAY_WIN_START,
@@ -15,6 +17,11 @@ const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export default function DayTimetable({ date, rosters }: { date: string; rosters: Roster[] }) {
   const bars = useMemo(() => dayTimetableBars(rosters, date), [rosters, date]);
   const order = useMemo(() => staffOrderFromBars(bars), [bars]);
+  const groupsQ = useQuery({ queryKey: ["shifts", "groups"], queryFn: listShiftGroups });
+  const colourOf = (code: string) => {
+    const g = groupsQ.data?.find((g) => g.code === code);
+    return g ? groupColourFor(g) : groupColour(code);
+  };
 
   // 39 hourly ticks (18:00 on day-1 → 09:00 on day+1 inclusive).
   const ticks = useMemo(() => {
@@ -130,7 +137,7 @@ export default function DayTimetable({ date, rosters }: { date: string; rosters:
                         width: `${width}%`,
                         top: 3,
                         bottom: 3,
-                        background: groupColour(b.shift_info.group),
+                        background: colourOf(b.shift_info.group),
                         borderRadius: 3,
                         color: "#fff",
                         fontSize: 10,

@@ -1,5 +1,8 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { RosterResult } from "../api/rosters";
-import { groupColour } from "../lib/colours";
+import { listShiftGroups } from "../api/shifts";
+import { groupColour, groupColourFor } from "../lib/colours";
 
 const WD = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
 
@@ -14,9 +17,59 @@ export default function RosterGrid({ result }: { result: RosterResult }) {
   const { roster_start, num_days, staff, shifts, assignments } = result;
   const days = Array.from({ length: num_days }, (_, i) => addDays(roster_start, i));
 
+  const groupsQ = useQuery({ queryKey: ["shifts", "groups"], queryFn: listShiftGroups });
+  const colourOf = (code: string) => {
+    const g = groupsQ.data?.find((g) => g.code === code);
+    return g ? groupColourFor(g) : groupColour(code);
+  };
+
+  const topRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [tableWidth, setTableWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const t = tableRef.current;
+    if (!t) return;
+    const update = () => setTableWidth(t.scrollWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(t);
+    return () => ro.disconnect();
+  }, [num_days, staff.length]);
+
+  useEffect(() => {
+    const top = topRef.current;
+    const bottom = bottomRef.current;
+    if (!top || !bottom) return;
+    let syncing = false;
+    const onTop = () => {
+      if (syncing) return;
+      syncing = true;
+      bottom.scrollLeft = top.scrollLeft;
+      syncing = false;
+    };
+    const onBottom = () => {
+      if (syncing) return;
+      syncing = true;
+      top.scrollLeft = bottom.scrollLeft;
+      syncing = false;
+    };
+    top.addEventListener("scroll", onTop);
+    bottom.addEventListener("scroll", onBottom);
+    return () => {
+      top.removeEventListener("scroll", onTop);
+      bottom.removeEventListener("scroll", onBottom);
+    };
+  }, []);
+
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: "var(--fs-sm)" }}>
+    <div>
+      <div ref={topRef} style={{ overflowX: "auto", overflowY: "hidden", height: 14 }}>
+        <div style={{ width: tableWidth, height: 1 }} />
+      </div>
+      <div ref={bottomRef} style={{ overflowX: "auto" }}>
+      <table ref={tableRef} style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: "var(--fs-sm)", margin: "0 auto" }}>
         <thead>
           <tr>
             <th
@@ -84,7 +137,7 @@ export default function RosterGrid({ result }: { result: RosterResult }) {
               {days.map((d, i) => {
                 const code = assignments[s.employee_id]?.[String(i)];
                 const info = code ? shifts[code] : undefined;
-                const c = info ? groupColour(info.group) : undefined;
+                const c = info ? colourOf(info.group) : undefined;
                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                 return (
                   <td
@@ -109,6 +162,7 @@ export default function RosterGrid({ result }: { result: RosterResult }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

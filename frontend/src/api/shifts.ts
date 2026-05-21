@@ -5,12 +5,14 @@ export interface ShiftGroup {
   code: string;
   is_work_shift: boolean;
   is_night_shift: boolean;
+  color: string;
 }
 
 export interface ShiftGroupInput {
   code: string;
   is_work_shift?: boolean;
   is_night_shift?: boolean;
+  color?: string;
 }
 
 export interface Shift {

@@ -20,6 +20,8 @@ interface Props {
   rangeActionLabel?: string;
   /** Override the hint text under the header. */
   hint?: string;
+  /** Persistent committed window to highlight when no interactive selection is in progress. */
+  committedRange?: { from: string; to: string } | null;
 }
 
 const DEFAULT_HINT =
@@ -33,6 +35,7 @@ export default function Calendar({
   dayActionLabel = "View day timetable",
   rangeActionLabel = "View range timetable",
   hint = DEFAULT_HINT,
+  committedRange = null,
 }: Props) {
   const today = new Date();
   const latestApproved = useMemo(
@@ -42,7 +45,12 @@ export default function Calendar({
         .sort((a, b) => b.roster_start.localeCompare(a.roster_start))[0],
     [rosters],
   );
-  const initial = latestApproved
+  const initial = committedRange
+    ? (() => {
+        const [y, m] = committedRange.from.split("-").map(Number);
+        return { year: y, month: m };
+      })()
+    : latestApproved
     ? (() => {
         const [y, m] = latestApproved.roster_start.split("-").map(Number);
         return { year: y, month: m };
@@ -88,11 +96,32 @@ export default function Calendar({
   }
 
   function isInSelection(ds: string): boolean {
-    if (!selStart) return false;
-    const a = selStart;
-    const b = selEnd ?? selStart;
-    const [lo, hi] = a <= b ? [a, b] : [b, a];
+    if (selStart) {
+      const a = selStart;
+      const b = selEnd ?? selStart;
+      const [lo, hi] = a <= b ? [a, b] : [b, a];
+      return ds >= lo && ds <= hi;
+    }
+    if (committedRange) {
+      const { from, to } = committedRange;
+      const [lo, hi] = from <= to ? [from, to] : [to, from];
+      return ds >= lo && ds <= hi;
+    }
+    return false;
+  }
+
+  function isCommittedCell(ds: string): boolean {
+    if (selStart) return false;
+    if (!committedRange) return false;
+    const { from, to } = committedRange;
+    const [lo, hi] = from <= to ? [from, to] : [to, from];
     return ds >= lo && ds <= hi;
+  }
+
+  function isEndpointCell(ds: string): boolean {
+    if (selStart) return ds === selStart || ds === selEnd;
+    if (committedRange) return ds === committedRange.from || ds === committedRange.to;
+    return false;
   }
 
   const [from, to] = selStart
@@ -190,7 +219,8 @@ export default function Calendar({
               count={dayStatus.get(ds)?.rosters.length ?? 0}
               selectable={selectableDays === "all" || (dayStatus.get(ds)?.status ?? "none") !== "none"}
               selected={isInSelection(ds)}
-              isEndpoint={ds === selStart || ds === selEnd}
+              isEndpoint={isEndpointCell(ds)}
+              isCommitted={isCommittedCell(ds)}
               onClick={() => {
                 const status = dayStatus.get(ds)?.status ?? "none";
                 if (selectableDays === "rostered" && status === "none") return;
@@ -211,6 +241,7 @@ function CalCell({
   selectable,
   selected,
   isEndpoint,
+  isCommitted,
   onClick,
 }: {
   ds: string;
@@ -219,14 +250,16 @@ function CalCell({
   selectable: boolean;
   selected: boolean;
   isEndpoint: boolean;
+  isCommitted: boolean;
   onClick: () => void;
 }) {
   const day = Number(ds.slice(8));
 
-  const bg =
+  const statusBg =
     status === "approved" ? "var(--status-approved-bg)"
     : status === "draft" ? "var(--status-draft-bg)"
     : "var(--surface)";
+  const bg = isCommitted ? "var(--primary-soft)" : statusBg;
   const ink =
     status === "approved" ? "var(--status-approved-ink)"
     : status === "draft" ? "var(--status-draft-ink)"
@@ -254,7 +287,7 @@ function CalCell({
         display: "flex",
         flexDirection: "column",
         gap: 4,
-        outline: selected && !isEndpoint ? `2px solid var(--primary-soft)` : "none",
+        outline: selected && !isEndpoint && !isCommitted ? `2px solid var(--primary-soft)` : "none",
       }}
     >
       <span className="mono" style={{ fontWeight: 600 }}>{String(day).padStart(2, "0")}</span>

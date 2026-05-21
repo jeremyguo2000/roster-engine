@@ -456,6 +456,7 @@ input, select, textarea { font-family: inherit; }
 
 .modal-box.modal-wide { max-width: 1200px; }
 .modal-box.modal-md   { max-width: 720px; }
+.modal-box.modal-full { max-width: calc(100vw - 32px); }
 
 .modal-close {
   position: absolute;
