@@ -45,6 +45,9 @@ export interface Roster {
   num_days: number;
   target_work_min: number;
   celery_task_id: string | null;
+}
+
+export interface RosterDetail extends Roster {
   result: RosterResult | null;
 }
 
@@ -62,10 +65,10 @@ export const listRosters = (params?: { status?: RosterStatus; profile_id?: numbe
   api.get<Roster[]>("/rosters", { params }).then((r) => r.data);
 
 export const getRoster = (id: number) =>
-  api.get<Roster>(`/rosters/${id}`).then((r) => r.data);
+  api.get<RosterDetail>(`/rosters/${id}`).then((r) => r.data);
 
 export const createRoster = (body: RosterCreateInput) =>
-  api.post<Roster>("/rosters", body).then((r) => r.data);
+  api.post<RosterDetail>("/rosters", body).then((r) => r.data);
 
 export const getRosterDemands = (id: number) =>
   api.get<Demand[]>(`/rosters/${id}/demands`).then((r) => r.data);
@@ -81,7 +84,7 @@ export const getRosterLeaves = (id: number) =>
   api.get<RosterLeavePreview[]>(`/rosters/${id}/leaves`).then((r) => r.data);
 
 export const approveRoster = (id: number) =>
-  api.post<Roster>(`/rosters/${id}/approve`).then((r) => r.data);
+  api.post<RosterDetail>(`/rosters/${id}/approve`).then((r) => r.data);
 
 export const discardRoster = (id: number) =>
   api.post(`/rosters/${id}/discard`).then(() => undefined);

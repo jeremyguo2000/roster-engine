@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { Roster, RosterResult } from "../api/rosters";
+import { RosterDetail, RosterResult } from "../api/rosters";
 import {
   DAY_WIN_DUR,
   DAY_WIN_END,
@@ -33,7 +33,7 @@ function makeResult(over: Partial<RosterResult>): RosterResult {
   };
 }
 
-function makeApproved(result: RosterResult, id = 1): Roster {
+function makeApproved(result: RosterResult, id = 1): RosterDetail {
   return {
     id,
     profile_id: 1,
@@ -90,7 +90,7 @@ describe("dayTimetableBars", () => {
   });
 
   it("ignores draft rosters", () => {
-    const draft: Roster = { ...r, status: "draft" };
+    const draft: RosterDetail = { ...r, status: "draft" };
     const bars = dayTimetableBars([draft], "2026-05-04");
     expect(bars).toEqual([]);
   });

@@ -6,6 +6,7 @@ import {
   Roster,
   approveRoster,
   discardRoster,
+  getRoster,
   listRosters,
 } from "../api/rosters";
 import { errorMessage } from "../api/client";
@@ -114,20 +115,7 @@ export default function RostersPage() {
 
       {viewing && (
         <Modal open onClose={() => setViewing(null)} title={viewing.name} size="full">
-          {viewing.result ? (
-            <>
-              <RosterGrid result={viewing.result} />
-              <RosterSummary result={viewing.result} />
-              <div className="row-end" style={{ marginTop: 16 }}>
-                {viewing.status === "draft" && (
-                  <ApproveButton roster={viewing} onAfter={() => setViewing(null)} />
-                )}
-                <DiscardButton roster={viewing} onAfter={() => setViewing(null)} />
-              </div>
-            </>
-          ) : (
-            <div className="empty-state">No solver result attached.</div>
-          )}
+          <RosterDetailView roster={viewing} onClose={() => setViewing(null)} />
         </Modal>
       )}
 
@@ -183,6 +171,14 @@ function RunningCard({ roster }: { roster: Roster }) {
 function FailedCard({ roster }: { roster: Roster }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const detailQ = useQuery({
+    queryKey: ["roster", roster.id],
+    queryFn: () => getRoster(roster.id),
+  });
+  const errorMsg = detailQ.data?.result?.error;
+  const tooltip = errorMsg
+    ?? (detailQ.isLoading ? "Loading error…" : "No error message recorded.");
+
   const del = useMutation({
     mutationFn: () => discardRoster(roster.id),
     onSuccess: () => {
@@ -191,18 +187,20 @@ function FailedCard({ roster }: { roster: Roster }) {
     },
     onError: (e) => toast(errorMessage(e, "Delete failed"), "error"),
   });
+
   return (
     <div className="card">
       <div className="card-header-row">
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: "var(--fs-lg)", fontWeight: 500 }}>{roster.name}</span>
-            <span className="badge badge-failed">Failed</span>
-            {roster.result?.error && (
-              <span className="muted" style={{ fontSize: "var(--fs-sm)" }}>
-                {roster.result.error}
-              </span>
-            )}
+            <span
+              className="badge badge-failed"
+              title={tooltip}
+              style={{ cursor: errorMsg ? "help" : "default" }}
+            >
+              Failed
+            </span>
           </div>
           <RosterMeta roster={roster} />
         </div>
@@ -211,6 +209,30 @@ function FailedCard({ roster }: { roster: Roster }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function RosterDetailView({ roster, onClose }: { roster: Roster; onClose: () => void }) {
+  const detailQ = useQuery({
+    queryKey: ["roster", roster.id],
+    queryFn: () => getRoster(roster.id),
+  });
+
+  if (detailQ.isLoading) return <div className="empty-state">Loading…</div>;
+  if (detailQ.isError) return <div className="empty-state">Failed to load roster.</div>;
+
+  const detail = detailQ.data;
+  if (!detail?.result) return <div className="empty-state">No solver result attached.</div>;
+
+  return (
+    <>
+      <RosterGrid result={detail.result} />
+      <RosterSummary result={detail.result} />
+      <div className="row-end" style={{ marginTop: 16 }}>
+        {detail.status === "draft" && <ApproveButton roster={detail} onAfter={onClose} />}
+        <DiscardButton roster={detail} onAfter={onClose} />
+      </div>
+    </>
   );
 }
 

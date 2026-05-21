@@ -1,4 +1,4 @@
-import { Roster, RosterResult, RosterShiftInfo } from "../api/rosters";
+import { Roster, RosterDetail, RosterResult, RosterShiftInfo } from "../api/rosters";
 import { addDaysIso, pickRosterForDate } from "./calendar";
 
 export interface TimetableBar {
@@ -38,7 +38,7 @@ export function rosterDayIndex(roster: Roster, date: string): number {
 }
 
 /** All bars within the day timetable window centred on `date`. */
-export function dayTimetableBars(rosters: Roster[], date: string): TimetableBar[] {
+export function dayTimetableBars(rosters: RosterDetail[], date: string): TimetableBar[] {
   const prevDate = addDaysIso(date, -1);
   const nextDate = addDaysIso(date, 1);
   const bars: TimetableBar[] = [];
@@ -58,7 +58,7 @@ export function dayTimetableBars(rosters: Roster[], date: string): TimetableBar[
 }
 
 /** All bars within a range timetable spanning `dates`. */
-export function rangeTimetableBars(rosters: Roster[], dates: string[]): TimetableBar[] {
+export function rangeTimetableBars(rosters: RosterDetail[], dates: string[]): TimetableBar[] {
   if (dates.length === 0) return [];
   const prevDate = addDaysIso(dates[0], -1);
   const nextDate = addDaysIso(dates[dates.length - 1], 1);
@@ -82,7 +82,7 @@ export function rangeTimetableBars(rosters: Roster[], dates: string[]): Timetabl
 // ─────────────────────────────────────────────────────────────────────────────
 
 function collectDay(
-  rosters: Roster[],
+  rosters: RosterDetail[],
   date: string,
   dayOffset: number,
   nsgOnly: boolean,

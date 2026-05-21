@@ -73,8 +73,8 @@ export function monthMatrix(year: number, month: number): (string | null)[] {
  * approved roster per date; if two overlap, the most recent `roster_start`
  * wins as defence-in-depth.
  */
-export function pickRosterForDate(rosters: Roster[], date: string): Roster | null {
-  let best: Roster | null = null;
+export function pickRosterForDate<T extends Roster>(rosters: T[], date: string): T | null {
+  let best: T | null = null;
   for (const r of rosters) {
     if (r.status !== "approved") continue;
     const last = addDays(r.roster_start, r.num_days - 1);

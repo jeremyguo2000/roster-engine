@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
-import { Roster } from "../api/rosters";
+import { Roster, RosterDetail, getRoster } from "../api/rosters";
 import { listShiftGroups } from "../api/shifts";
 import { groupColour, groupColourFor } from "../lib/colours";
 import {
@@ -11,7 +11,7 @@ import {
   rangeWindowDuration,
   staffOrderFromBars,
 } from "../lib/timetable";
-import { dateRange } from "../lib/calendar";
+import { addDaysIso, dateRange, pickRosterForDate } from "../lib/calendar";
 
 const WD = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -25,7 +25,30 @@ export default function RangeTimetable({
   rosters: Roster[];
 }) {
   const dates = useMemo(() => dateRange(from, to), [from, to]);
-  const bars = useMemo(() => rangeTimetableBars(rosters, dates), [rosters, dates]);
+
+  const neededIds = useMemo(() => {
+    const ids = new Set<number>();
+    const windowDates = [addDaysIso(dates[0], -1), ...dates, addDaysIso(dates[dates.length - 1], 1)];
+    for (const d of windowDates) {
+      const r = pickRosterForDate(rosters, d);
+      if (r) ids.add(r.id);
+    }
+    return [...ids];
+  }, [rosters, dates]);
+
+  const detailQs = useQueries({
+    queries: neededIds.map((id) => ({
+      queryKey: ["roster", id],
+      queryFn: () => getRoster(id),
+    })),
+  });
+  const isLoadingDetails = detailQs.some((q) => q.isLoading);
+  const details = useMemo(
+    () => detailQs.map((q) => q.data).filter((d): d is RosterDetail => !!d),
+    [detailQs],
+  );
+
+  const bars = useMemo(() => rangeTimetableBars(details, dates), [details, dates]);
   const order = useMemo(() => staffOrderFromBars(bars), [bars]);
   const winDur = rangeWindowDuration(dates.length);
   const groupsQ = useQuery({ queryKey: ["shifts", "groups"], queryFn: listShiftGroups });
@@ -103,7 +126,9 @@ export default function RangeTimetable({
         </div>
       </div>
 
-      {order.length === 0 ? (
+      {isLoadingDetails ? (
+        <div className="empty-state">Loading…</div>
+      ) : order.length === 0 ? (
         <div className="empty-state">No shifts in this window.</div>
       ) : (
         order.map((s) => {

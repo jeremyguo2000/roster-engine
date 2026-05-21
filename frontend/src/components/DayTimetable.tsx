@@ -1,8 +1,9 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
-import { Roster } from "../api/rosters";
+import { Roster, RosterDetail, getRoster } from "../api/rosters";
 import { listShiftGroups } from "../api/shifts";
+import { addDaysIso, pickRosterForDate } from "../lib/calendar";
 import { groupColour, groupColourFor } from "../lib/colours";
 import {
   DAY_WIN_DUR,
@@ -15,7 +16,28 @@ import {
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function DayTimetable({ date, rosters }: { date: string; rosters: Roster[] }) {
-  const bars = useMemo(() => dayTimetableBars(rosters, date), [rosters, date]);
+  const neededIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const d of [addDaysIso(date, -1), date, addDaysIso(date, 1)]) {
+      const r = pickRosterForDate(rosters, d);
+      if (r) ids.add(r.id);
+    }
+    return [...ids];
+  }, [rosters, date]);
+
+  const detailQs = useQueries({
+    queries: neededIds.map((id) => ({
+      queryKey: ["roster", id],
+      queryFn: () => getRoster(id),
+    })),
+  });
+  const isLoadingDetails = detailQs.some((q) => q.isLoading);
+  const details = useMemo(
+    () => detailQs.map((q) => q.data).filter((d): d is RosterDetail => !!d),
+    [detailQs],
+  );
+
+  const bars = useMemo(() => dayTimetableBars(details, date), [details, date]);
   const order = useMemo(() => staffOrderFromBars(bars), [bars]);
   const groupsQ = useQuery({ queryKey: ["shifts", "groups"], queryFn: listShiftGroups });
   const colourOf = (code: string) => {
@@ -90,7 +112,9 @@ export default function DayTimetable({ date, rosters }: { date: string; rosters:
       </div>
 
       {/* Rows */}
-      {order.length === 0 ? (
+      {isLoadingDetails ? (
+        <div className="empty-state">Loading…</div>
+      ) : order.length === 0 ? (
         <div className="empty-state">No shifts in this window.</div>
       ) : (
         order.map((s) => {
