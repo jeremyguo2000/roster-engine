@@ -1,3 +1,5 @@
+import copy
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -5,7 +7,7 @@ from app.database import get_db
 from app.models import Profile, ProfileStaff, ProfileShift, Staff, Shift, StaffGroup, ShiftGroup, User
 from app.dependencies.auth import get_current_user
 from app.schemas.profile import (
-    ProfileCreate, ProfileUpdate, ProfileOut,
+    ProfileCreate, ProfileUpdate, ProfileDuplicate, ProfileOut,
     ProfileStaffAdd, ProfileStaffOut, ProfileStaffUpdate,
     ProfileShiftAdd, ProfileShiftOut,
 )
@@ -79,6 +81,30 @@ def delete_profile(profile_id: int, db: Session = Depends(get_db),
             status.HTTP_409_CONFLICT,
             "Cannot delete this profile — it is referenced by other records."
         )
+
+
+@router.post("/{profile_id}/duplicate", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
+def duplicate_profile(profile_id: int, body: ProfileDuplicate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    source = db.get(Profile, profile_id)
+    if not source:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
+    if db.query(Profile).filter_by(name=body.name).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Profile '{body.name}' already exists.")
+
+    new_profile = Profile(name=body.name, config=copy.deepcopy(source.config))
+    db.add(new_profile)
+    db.flush()
+
+    for ps in source.profile_staff:
+        db.add(ProfileStaff(profile_id=new_profile.id, staff_id=ps.staff_id, excluded=ps.excluded))
+    for psh in source.profile_shifts:
+        db.add(ProfileShift(profile_id=new_profile.id, shift_id=psh.shift_id))
+
+    db.commit()
+    db.refresh(new_profile)
+    return new_profile
 
 
 # ── Profile Staff ────────────────────────────────────────────────────

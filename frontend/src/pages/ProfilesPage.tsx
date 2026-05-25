@@ -5,6 +5,7 @@ import {
   Profile,
   createProfile,
   deleteProfile,
+  duplicateProfile,
   listProfiles,
   updateProfile,
 } from "../api/profiles";
@@ -23,6 +24,7 @@ export default function ProfilesPage() {
   const profilesQ = useQuery({ queryKey: ["profiles"], queryFn: listProfiles });
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
+  const [duplicateSource, setDuplicateSource] = useState<Profile | null>(null);
 
   return (
     <div>
@@ -41,7 +43,12 @@ export default function ProfilesPage() {
 
       <div className="stack">
         {profilesQ.data?.map((p) => (
-          <ProfileCard key={p.id} profile={p} onEdit={() => setEditing(p)} />
+          <ProfileCard
+            key={p.id}
+            profile={p}
+            onEdit={() => setEditing(p)}
+            onDuplicate={() => setDuplicateSource(p)}
+          />
         ))}
       </div>
 
@@ -54,6 +61,16 @@ export default function ProfilesPage() {
           }}
         />
       )}
+      {duplicateSource && (
+        <DuplicateProfileModal
+          source={duplicateSource}
+          onClose={() => setDuplicateSource(null)}
+          onDuplicated={(p) => {
+            setDuplicateSource(null);
+            setEditing(p);
+          }}
+        />
+      )}
       {editing && <EditProfileModal profile={editing} onClose={() => setEditing(null)} />}
     </div>
   );
@@ -61,7 +78,15 @@ export default function ProfilesPage() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProfileCard({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
+function ProfileCard({
+  profile,
+  onEdit,
+  onDuplicate,
+}: {
+  profile: Profile;
+  onEdit: () => void;
+  onDuplicate: () => void;
+}) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const del = useMutation({
@@ -147,6 +172,7 @@ function ProfileCard({ profile, onEdit }: { profile: Profile; onEdit: () => void
         </div>
         <div className="row-end">
           <button className="btn btn-sm" onClick={onEdit}>Edit</button>
+          <button className="btn btn-sm btn-primary" onClick={onDuplicate}>Duplicate</button>
           <button
             className="btn btn-sm btn-danger"
             onClick={() => confirm(`Delete profile ${profile.name}?`) && del.mutate()}
@@ -205,6 +231,60 @@ function CreateProfileModal({
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn btn-primary" disabled={mut.isPending || !name.trim()}>
             {mut.isPending ? "Creating…" : "Create & Configure"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DuplicateProfileModal({
+  source,
+  onClose,
+  onDuplicated,
+}: {
+  source: Profile;
+  onClose: () => void;
+  onDuplicated: (p: Profile) => void;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [name, setName] = useState(`${source.name} (copy)`);
+  const mut = useMutation({
+    mutationFn: () => duplicateProfile(source.id, { name: name.trim() }),
+    onSuccess: (p) => {
+      toast(`Profile ${p.name} created`, "success");
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      onDuplicated(p);
+    },
+    onError: (e) => toast(errorMessage(e, "Duplicate failed"), "error"),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (name.trim()) mut.mutate();
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Duplicate Profile — ${source.name}`} size="md">
+      <form onSubmit={onSubmit} className="stack">
+        <div className="field">
+          <label className="label">New profile name</label>
+          <input
+            className="input"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <span className="field-hint">Shifts, staff and config will be copied from {source.name}.</span>
+        </div>
+        <div className="row-end">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={mut.isPending || !name.trim()}>
+            {mut.isPending ? "Duplicating…" : "Duplicate & Configure"}
           </button>
         </div>
       </form>

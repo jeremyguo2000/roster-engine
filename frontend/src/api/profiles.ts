@@ -55,6 +55,9 @@ export const updateProfile = (id: number, body: Partial<ProfileInput>) =>
 export const deleteProfile = (id: number) =>
   api.delete(`/profiles/${id}`).then(() => undefined);
 
+export const duplicateProfile = (id: number, body: { name: string }) =>
+  api.post<Profile>(`/profiles/${id}/duplicate`, body).then((r) => r.data);
+
 // Profile staff
 export const listProfileStaff = (profile_id: number) =>
   api.get<ProfileStaffEntry[]>(`/profiles/${profile_id}/staff`).then((r) => r.data);
