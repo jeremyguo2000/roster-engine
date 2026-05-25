@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -8,6 +8,7 @@ import {
   deleteRoster,
   discardRoster,
   getRoster,
+  getRosterDemands,
   listRosters,
 } from "../api/rosters";
 import { errorMessage } from "../api/client";
@@ -206,6 +207,7 @@ function FailedCard({ roster }: { roster: Roster }) {
           <RosterMeta roster={roster} />
         </div>
         <div className="row-end">
+          <RegenerateButton roster={roster} />
           <button className="btn btn-sm btn-danger" onClick={() => del.mutate()}>Discard</button>
         </div>
       </div>
@@ -250,6 +252,7 @@ function DraftCard({ roster, onView }: { roster: Roster; onView: () => void }) {
         </div>
         <div className="row-end">
           <button className="btn btn-sm" onClick={onView}>View</button>
+          <RegenerateButton roster={roster} />
           <ApproveButton roster={roster} />
           <DiscardButton roster={roster} />
         </div>
@@ -295,6 +298,38 @@ function ApproveButton({ roster, onAfter }: { roster: Roster; onAfter?: () => vo
   return (
     <button className="btn btn-sm btn-success" onClick={() => mut.mutate()} disabled={mut.isPending}>
       {mut.isPending ? "Approving…" : "Approve"}
+    </button>
+  );
+}
+
+function RegenerateButton({ roster }: { roster: Roster }) {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const mut = useMutation({
+    mutationFn: () => getRosterDemands(roster.id),
+    onSuccess: (demands) => {
+      navigate("/generate", {
+        state: {
+          regenerateFrom: {
+            source_roster_id: roster.id,
+            source_roster_name: roster.name,
+            roster_start: roster.roster_start,
+            num_days: roster.num_days,
+            target_work_min: roster.target_work_min,
+            demands,
+          },
+        },
+      });
+    },
+    onError: (e) => toast(errorMessage(e, "Could not load demands"), "error"),
+  });
+  return (
+    <button
+      className="btn btn-sm btn-primary"
+      onClick={() => mut.mutate()}
+      disabled={mut.isPending}
+    >
+      {mut.isPending ? "Loading…" : "Regenerate"}
     </button>
   );
 }

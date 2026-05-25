@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { listProfiles } from "../api/profiles";
 import { listRosters, createRoster } from "../api/rosters";
 import { listLeaves } from "../api/staff";
 import { listSkillTypes } from "../api/skills";
-import { createDemand, DemandInput } from "../api/demands";
+import { createDemand, DemandInput, Demand } from "../api/demands";
 import { errorMessage } from "../api/client";
 import { useToast } from "../components/Toast";
 import Calendar from "../components/Calendar";
-import { hhmmToMin } from "../lib/time";
+import { hhmmToMin, minToHHMM } from "../lib/time";
 import { addDaysIso, dateRange, isoDate, pickRosterForDate } from "../lib/calendar";
 
 interface DemandDraft {
@@ -24,8 +24,19 @@ function emptyDemand(): DemandDraft {
   return { start: "00:00", end: "00:00", headcount: 1, skill_value_id: null };
 }
 
+interface RegenerateFromState {
+  source_roster_id: number;
+  source_roster_name: string;
+  roster_start: string;
+  num_days: number;
+  target_work_min: number;
+  demands: Demand[];
+}
+
 export default function GeneratePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const prefill = (location.state as { regenerateFrom?: RegenerateFromState } | null)?.regenerateFrom ?? null;
   const { toast } = useToast();
 
   // Step 1 — profile + name
@@ -34,7 +45,7 @@ export default function GeneratePage() {
   const skillsQ = useQuery({ queryKey: ["skills", "types"], queryFn: listSkillTypes });
 
   const [profileId, setProfileId] = useState<number | null>(null);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(prefill ? `${prefill.source_roster_name} (regen)` : "");
 
   useEffect(() => {
     if (profileId === null && profilesQ.data && profilesQ.data.length > 0) {
@@ -43,10 +54,10 @@ export default function GeneratePage() {
   }, [profilesQ.data, profileId]);
 
   // Step 2 — range + target work
-  const [rosterStart, setRosterStart] = useState<string>(isoDate(new Date()));
-  const [numDays, setNumDays] = useState(1);
-  const [targetWorkHours, setTargetWorkHours] = useState(40);
-  const [startInitialised, setStartInitialised] = useState(false);
+  const [rosterStart, setRosterStart] = useState<string>(prefill?.roster_start ?? isoDate(new Date()));
+  const [numDays, setNumDays] = useState(prefill?.num_days ?? 1);
+  const [targetWorkHours, setTargetWorkHours] = useState(prefill ? prefill.target_work_min / 60 : 40);
+  const [startInitialised, setStartInitialised] = useState(prefill !== null);
 
   useEffect(() => {
     if (startInitialised) return;
@@ -87,7 +98,20 @@ export default function GeneratePage() {
   });
 
   // Step 4 — demands per day
-  const [demands, setDemands] = useState<Record<string, DemandDraft[]>>({});
+  const [demands, setDemands] = useState<Record<string, DemandDraft[]>>(() => {
+    if (!prefill) return {};
+    const grouped: Record<string, DemandDraft[]> = {};
+    for (const d of prefill.demands) {
+      const draft: DemandDraft = {
+        start: minToHHMM(d.start_min),
+        end: minToHHMM(d.end_min),
+        headcount: d.headcount,
+        skill_value_id: d.skill_value_id,
+      };
+      (grouped[d.date] ??= []).push(draft);
+    }
+    return grouped;
+  });
 
   useEffect(() => {
     // Ensure every date has an entry; preserve existing.
