@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { Roster, RosterDetail, getRoster } from "../api/rosters";
@@ -12,6 +12,7 @@ import {
   fmtMin,
   staffOrderFromBars,
 } from "../lib/timetable";
+import { exportTimetableToXlsx } from "../lib/timetableExport";
 
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -64,10 +65,36 @@ export default function DayTimetable({ date, rosters }: { date: string; rosters:
     return WD[new Date(y, m - 1, d).getDay()];
   })();
 
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportTimetableToXlsx(`timetable-${date}.xlsx`, [{ date, bars }], colourOf);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
-      <div className="muted" style={{ fontSize: "var(--fs-sm)", marginBottom: 8 }}>
-        {wd} {date} — 18:00 prev day to 09:00 next day. NSG shifts spill in from neighbours.
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 8,
+        }}
+      >
+        <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>
+          {wd} {date} — 18:00 prev day to 09:00 next day. NSG shifts spill in from neighbours.
+        </div>
+        <button
+          className="btn btn-sm btn-primary"
+          onClick={handleExport}
+          disabled={exporting || isLoadingDetails || order.length === 0}
+        >
+          {exporting ? "Exporting…" : "Export"}
+        </button>
       </div>
 
       {/* Ruler */}

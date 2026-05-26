@@ -11,7 +11,10 @@ import {
   getRosterDemands,
   listRosters,
 } from "../api/rosters";
+import { listShiftGroups } from "../api/shifts";
 import { errorMessage } from "../api/client";
+import { groupColour, groupColourFor } from "../lib/colours";
+import { exportRosterToXlsx } from "../lib/rosterExport";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
 import RosterGrid from "../components/RosterGrid";
@@ -117,7 +120,7 @@ export default function RostersPage() {
 
       {viewing && (
         <Modal open onClose={() => setViewing(null)} title={viewing.name} size="full">
-          <RosterDetailView roster={viewing} onClose={() => setViewing(null)} />
+          <RosterDetailView roster={viewing} />
         </Modal>
       )}
 
@@ -215,7 +218,7 @@ function FailedCard({ roster }: { roster: Roster }) {
   );
 }
 
-function RosterDetailView({ roster, onClose }: { roster: Roster; onClose: () => void }) {
+function RosterDetailView({ roster }: { roster: Roster }) {
   const detailQ = useQuery({
     queryKey: ["roster", roster.id],
     queryFn: () => getRoster(roster.id),
@@ -231,11 +234,41 @@ function RosterDetailView({ roster, onClose }: { roster: Roster; onClose: () => 
     <>
       <RosterGrid result={detail.result} />
       <RosterSummary result={detail.result} />
-      <div className="row-end" style={{ marginTop: 16 }}>
-        {detail.status === "draft" && <ApproveButton roster={detail} onAfter={onClose} />}
-        <DiscardButton roster={detail} onAfter={onClose} />
-      </div>
     </>
+  );
+}
+
+function ExportButton({ roster }: { roster: Roster }) {
+  const { toast } = useToast();
+  const groupsQ = useQuery({ queryKey: ["shifts", "groups"], queryFn: listShiftGroups });
+  const mut = useMutation({
+    mutationFn: () => getRoster(roster.id),
+    onSuccess: async (detail) => {
+      if (!detail.result) {
+        toast("No solver result to export", "error");
+        return;
+      }
+      const groups = groupsQ.data ?? [];
+      const resolveColour = (code: string) => {
+        const g = groups.find((g) => g.code === code);
+        return g ? groupColourFor(g) : groupColour(code);
+      };
+      try {
+        await exportRosterToXlsx(detail, detail.result, resolveColour);
+      } catch (e) {
+        toast(errorMessage(e, "Export failed"), "error");
+      }
+    },
+    onError: (e) => toast(errorMessage(e, "Could not load roster"), "error"),
+  });
+  return (
+    <button
+      className="btn btn-sm btn-primary"
+      onClick={() => mut.mutate()}
+      disabled={mut.isPending || groupsQ.isLoading}
+    >
+      {mut.isPending ? "Exporting…" : "Export"}
+    </button>
   );
 }
 
@@ -274,6 +307,7 @@ function ApprovedCard({ roster, onView }: { roster: Roster; onView: () => void }
         </div>
         <div className="row-end">
           <button className="btn btn-sm" onClick={onView}>View</button>
+          <ExportButton roster={roster} />
           <DiscardButton roster={roster} />
         </div>
       </div>

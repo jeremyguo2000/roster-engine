@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { Roster, RosterDetail, getRoster } from "../api/rosters";
@@ -6,11 +6,13 @@ import { listShiftGroups } from "../api/shifts";
 import { groupColour, groupColourFor } from "../lib/colours";
 import {
   DAY_WIN_START,
+  dayTimetableBars,
   fmtMin,
   rangeTimetableBars,
   rangeWindowDuration,
   staffOrderFromBars,
 } from "../lib/timetable";
+import { exportTimetableToXlsx } from "../lib/timetableExport";
 import { addDaysIso, dateRange, pickRosterForDate } from "../lib/calendar";
 
 const WD = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -81,10 +83,37 @@ export default function RangeTimetable({
     return out;
   }, [dates, winDur]);
 
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const perDay = dates.map((d) => ({ date: d, bars: dayTimetableBars(details, d) }));
+      await exportTimetableToXlsx(`timetable-${from}-to-${to}.xlsx`, perDay, colourOf);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
-      <div className="muted" style={{ fontSize: "var(--fs-sm)", marginBottom: 8 }}>
-        {from} → {to} · {dates.length} day{dates.length === 1 ? "" : "s"}. NSG shifts on the boundary days spill in.
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 8,
+        }}
+      >
+        <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>
+          {from} → {to} · {dates.length} day{dates.length === 1 ? "" : "s"}. NSG shifts on the boundary days spill in.
+        </div>
+        <button
+          className="btn btn-sm btn-primary"
+          onClick={handleExport}
+          disabled={exporting || isLoadingDetails || order.length === 0}
+        >
+          {exporting ? "Exporting…" : "Export"}
+        </button>
       </div>
 
       {/* Ruler row */}
