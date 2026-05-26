@@ -27,6 +27,7 @@ function emptyDemand(): DemandDraft {
 interface RegenerateFromState {
   source_roster_id: number;
   source_roster_name: string;
+  profile_id: number;
   roster_start: string;
   num_days: number;
   target_work_min: number;
@@ -44,7 +45,7 @@ export default function GeneratePage() {
   const rostersQ = useQuery({ queryKey: ["rosters"], queryFn: () => listRosters() });
   const skillsQ = useQuery({ queryKey: ["skills", "types"], queryFn: listSkillTypes });
 
-  const [profileId, setProfileId] = useState<number | null>(null);
+  const [profileId, setProfileId] = useState<number | null>(prefill?.profile_id ?? null);
   const [name, setName] = useState(prefill ? `${prefill.source_roster_name} (regen)` : "");
 
   useEffect(() => {

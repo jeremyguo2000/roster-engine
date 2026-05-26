@@ -37,6 +37,7 @@ function makeApproved(result: RosterResult, id = 1): RosterDetail {
   return {
     id,
     profile_id: 1,
+    profile_name: "Test Profile",
     name: `R${id}`,
     status: "approved",
     roster_start: result.roster_start,

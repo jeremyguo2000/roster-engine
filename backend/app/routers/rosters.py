@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import timedelta
 
 from app.database import get_db
@@ -18,7 +18,7 @@ def list_rosters(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(Roster)
+    q = db.query(Roster).options(joinedload(Roster.profile))
     if status:
         q = q.filter(Roster.status == status)
     if profile_id:

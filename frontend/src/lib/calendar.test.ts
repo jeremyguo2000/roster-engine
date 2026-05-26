@@ -12,6 +12,7 @@ import { Roster } from "../api/rosters";
 function roster(over: Partial<Roster> & Pick<Roster, "id" | "roster_start" | "num_days" | "status">): Roster {
   return {
     profile_id: 1,
+    profile_name: "Test Profile",
     name: `Roster ${over.id}`,
     target_work_min: 2400,
     celery_task_id: null,

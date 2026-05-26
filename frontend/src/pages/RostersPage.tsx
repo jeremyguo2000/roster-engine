@@ -145,7 +145,7 @@ export default function RostersPage() {
 function RosterMeta({ roster }: { roster: Roster }) {
   return (
     <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: 4 }}>
-      <span className="mono">{roster.roster_start}</span> · {roster.num_days} day{roster.num_days === 1 ? "" : "s"}
+      {roster.profile_name} · <span className="mono">{roster.roster_start}</span> · {roster.num_days} day{roster.num_days === 1 ? "" : "s"}
       {" · "}target {(roster.target_work_min / 60).toFixed(1)}h / staff
     </div>
   );
@@ -313,6 +313,7 @@ function RegenerateButton({ roster }: { roster: Roster }) {
           regenerateFrom: {
             source_roster_id: roster.id,
             source_roster_name: roster.name,
+            profile_id: roster.profile_id,
             roster_start: roster.roster_start,
             num_days: roster.num_days,
             target_work_min: roster.target_work_min,
@@ -320,6 +321,7 @@ function RegenerateButton({ roster }: { roster: Roster }) {
           },
         },
       });
+      window.scrollTo({ top: 0 });
     },
     onError: (e) => toast(errorMessage(e, "Could not load demands"), "error"),
   });

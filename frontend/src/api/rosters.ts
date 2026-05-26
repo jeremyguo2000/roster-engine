@@ -39,6 +39,7 @@ export interface RosterResult {
 export interface Roster {
   id: number;
   profile_id: number;
+  profile_name: string;
   name: string;
   status: RosterStatus;
   roster_start: string;
