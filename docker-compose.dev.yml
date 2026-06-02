@@ -66,6 +66,20 @@ services:
       - backend
     command: npm run dev -- --host 0.0.0.0
 
+  mcp:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - ROSTER_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    command: python -m app.mcp_server
+
   celery_worker:
     build:
       context: ./backend
