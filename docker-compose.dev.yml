@@ -76,6 +76,9 @@ services:
       - ./backend:/app
     environment:
       - ROSTER_API_URL=http://backend:8000
+      # Service-account credentials live in THIS container only, never the agent's.
+      - ROSTER_SERVICE_USERNAME=${ROSTER_SERVICE_USERNAME}
+      - ROSTER_SERVICE_PASSWORD=${ROSTER_SERVICE_PASSWORD}
     depends_on:
       - backend
     command: python -m app.mcp_server

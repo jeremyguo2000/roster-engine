@@ -2,6 +2,9 @@ from typing import Any
 
 import httpx
 
+from .identity import resolve_token
+from .token_manager import ServiceTokenManager
+
 
 class BackendError(Exception):
     def __init__(self, status_code: int, detail: Any):
@@ -11,21 +14,27 @@ class BackendError(Exception):
 
 
 class RosterApiClient:
-    def __init__(self, base_url: str, jwt: str):
-        self._client = httpx.AsyncClient(
-            base_url=base_url.rstrip("/"),
-            headers={"Authorization": f"Bearer {jwt}"},
-            timeout=30.0,
-        )
+    """Talks to the backend as the MCP server's service account.
 
-    async def __aenter__(self) -> "RosterApiClient":
-        return self
+    Holds one long-lived httpx client with no static auth header; the bearer token
+    is resolved per request from the ServiceTokenManager. A backend 401 triggers one
+    re-login + retry in case the cached token was invalidated server-side.
+    """
 
-    async def __aexit__(self, *exc) -> None:
+    def __init__(self, base_url: str, token_manager: ServiceTokenManager):
+        self._token_manager = token_manager
+        self._client = httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=30.0)
+
+    async def aclose(self) -> None:
         await self._client.aclose()
 
     async def _request(self, method: str, path: str, **kwargs) -> Any:
-        resp = await self._client.request(method, path, **kwargs)
+        resp = await self._send(method, path, **kwargs)
+        if resp.status_code == 401:
+            # Token may have been invalidated server-side; force a fresh login once.
+            self._token_manager.invalidate()
+            resp = await self._send(method, path, **kwargs)
+
         if resp.status_code >= 400:
             try:
                 detail = resp.json()
@@ -35,6 +44,11 @@ class RosterApiClient:
         if resp.status_code == 204 or not resp.content:
             return None
         return resp.json()
+
+    async def _send(self, method: str, path: str, **kwargs) -> httpx.Response:
+        token = await resolve_token(self._token_manager)
+        headers = {**kwargs.pop("headers", {}), "Authorization": f"Bearer {token}"}
+        return await self._client.request(method, path, headers=headers, **kwargs)
 
     async def list_profiles(self) -> list[dict]:
         return await self._request("GET", "/api/profiles")
