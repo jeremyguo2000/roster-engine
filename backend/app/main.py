@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
- 
+from fastapi.staticfiles import StaticFiles
+
 from app.routers import skills, shifts, staff, profiles, rosters, demands, auth
  
 app = FastAPI(
@@ -29,4 +30,12 @@ app.include_router(demands.router,  prefix="/api")
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+# Repo docs (documentation/ is mounted into the container read-only in dev)
+app.mount(
+    "/documentation",
+    StaticFiles(directory="documentation", check_dir=False),
+    name="documentation",
+)
  
