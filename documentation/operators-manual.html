@@ -173,7 +173,7 @@
       <li><a href="#gotchas">Gotchas</a></li>
       <li><a href="#trouble">Troubleshooting</a></li>
       <li><a href="#mcp">The MCP server</a></li>
-      <li><a href="#repo">Repo &amp; branch situation</a></li>
+      <li><a href="#repo">Repo history &amp; other docs</a></li>
     </ol>
   </nav>
 
@@ -192,8 +192,8 @@
   <p>Because solving is asynchronous, generating a roster never blocks the UI: you submit it, the roster sits in <span class="pill running">running</span>, and the page polls until the worker finishes.</p>
 
   <h2 id="run"><span class="secno">2</span>Starting &amp; stopping</h2>
-  <div class="callout">Run everything from <code>/home/guo/roster-engine-mcp</code> &mdash; <strong>not</strong> <code>/home/guo/roster-engine</code>. See &sect;9 for why there are two directories.</div>
-<pre><code>cd /home/guo/roster-engine-mcp
+  <div class="callout">Run everything from the repo root, on the <code>main</code> branch. All generated credentials live in the repo's <code>.env</code> (gitignored).</div>
+<pre><code>cd /home/guo/roster-engine
 
 docker compose -f docker-compose.dev.yml up -d      <span class="cmt"># start everything</span>
 docker compose -f docker-compose.dev.yml down       <span class="cmt"># stop (data survives)</span>
@@ -337,15 +337,11 @@ docker compose -f docker-compose.dev.yml ps         <span class="cmt"># service 
   <h2 id="mcp"><span class="secno">8</span>The MCP server</h2>
   <p>The <code>mcp</code> container (port 8001, endpoint <code>http://localhost:8001/mcp</code>) exposes the roster API as MCP tools &mdash; <code>list_profiles</code>, <code>create_roster</code>, <code>get_roster_status</code>, and friends &mdash; so an MCP-capable chatbot (Claude Code, OpenClaw, &hellip;) can generate rosters conversationally. It authenticates to the backend with its own service account (<code>mcp_service</code>, password in <code>.env</code>). Full client-setup walkthrough: <code>MCP-guide.md</code> in the repo root. You can ignore this service entirely if you only use the web app.</p>
 
-  <h2 id="repo"><span class="secno">9</span>Repo &amp; branch situation</h2>
-  <p>This is the one piece of history you need: the repo's <code>main</code> branch is <strong>stale</strong> &mdash; it stops in May 2026 and contains only the backend. The complete application (frontend, MCP server, later fixes) lives on the <code>origin/mcp</code> branch, which was never merged back.</p>
-  <ul>
-    <li><code>/home/guo/roster-engine</code> &mdash; original checkout, on <code>main</code>. Backend only. Its Docker stack is stopped. Don't run from here.</li>
-    <li><code>/home/guo/roster-engine-mcp</code> &mdash; a git worktree pinned to <code>origin/mcp</code> (latest commit as of 15 Jun 2026). <strong>This is the live app.</strong> Its <code>.env</code> holds all generated credentials.</li>
-  </ul>
-  <p>Long-term, merging <code>mcp</code> into <code>main</code> (it's missing only one trivial commit from <code>main</code>) would remove this trap. Other reference docs in the repo: <code>README.md</code> (dev setup &amp; command reference), <code>MCP-guide.md</code> (chatbot integration), <code>CLAUDE.md</code> (AI-assistant notes, currently describes <code>main</code> only), and <code>documentation/</code> (architecture &amp; ER diagrams).</p>
+  <h2 id="repo"><span class="secno">9</span>Repo history &amp; other docs</h2>
+  <p>One piece of history worth knowing: the app was developed on feature branches (<code>claude-code</code> &rarr; <code>plan-mode</code> &rarr; <code>mcp</code>) while <code>main</code> lagged behind with only the backend. Everything was merged into <code>main</code> on 6 Jul 2026, so <code>main</code> is now the complete, current application &mdash; if you see references to running from an <code>mcp</code> branch or a separate worktree folder, they predate the merge and are obsolete.</p>
+  <p>Other reference docs in the repo: <code>README.md</code> (dev setup &amp; command reference), <code>MCP-guide.md</code> (chatbot integration), <code>CLAUDE.md</code> (AI-assistant notes), and <code>documentation/</code> (architecture &amp; ER diagrams, plus this manual).</p>
 
-  <p class="foot">Compiled from the code on <code>origin/mcp</code> (commit <code>d587f3f</code>) and verified against a live run &mdash; including a real login, a solved roster, and the failure modes in &sect;6.</p>
+  <p class="foot">Compiled from the code now on <code>main</code> and verified against a live run &mdash; including a real login, a solved roster, and the failure modes in &sect;6.</p>
 </div>
 
 </body>
