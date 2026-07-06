@@ -32,4 +32,11 @@ postgres_data/
 # Frontend (for later)
 node_modules/
 frontend/dist/
+frontend/.vite/
 frontend/.env.local
+
+# Claude Code / tooling
+.claude/
+.playwright-mcp/
+CLAUDE.md
+.verify/

@@ -37,6 +37,10 @@ class Roster(Base):
         "RosterDemand", back_populates="roster", cascade="all, delete-orphan"
     )
 
+    @property
+    def profile_name(self) -> str:
+        return self.profile.name
+
 
 class Demand(Base):
     __tablename__ = "demand"

@@ -12,6 +12,9 @@ class ProfileUpdate(BaseModel):
     name: str | None = None
     config: dict | None = None
 
+class ProfileDuplicate(BaseModel):
+    name: str
+
 class ProfileOut(ProfileBase):
     id: int
     model_config = {"from_attributes": True}

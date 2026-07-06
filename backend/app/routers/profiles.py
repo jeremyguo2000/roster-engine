@@ -1,3 +1,5 @@
+import copy
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -5,7 +7,7 @@ from app.database import get_db
 from app.models import Profile, ProfileStaff, ProfileShift, Staff, Shift, StaffGroup, ShiftGroup, User
 from app.dependencies.auth import get_current_user
 from app.schemas.profile import (
-    ProfileCreate, ProfileUpdate, ProfileOut,
+    ProfileCreate, ProfileUpdate, ProfileDuplicate, ProfileOut,
     ProfileStaffAdd, ProfileStaffOut, ProfileStaffUpdate,
     ProfileShiftAdd, ProfileShiftOut,
 )
@@ -81,6 +83,30 @@ def delete_profile(profile_id: int, db: Session = Depends(get_db),
         )
 
 
+@router.post("/{profile_id}/duplicate", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
+def duplicate_profile(profile_id: int, body: ProfileDuplicate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    source = db.get(Profile, profile_id)
+    if not source:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
+    if db.query(Profile).filter_by(name=body.name).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Profile '{body.name}' already exists.")
+
+    new_profile = Profile(name=body.name, config=copy.deepcopy(source.config))
+    db.add(new_profile)
+    db.flush()
+
+    for ps in source.profile_staff:
+        db.add(ProfileStaff(profile_id=new_profile.id, staff_id=ps.staff_id, excluded=ps.excluded))
+    for psh in source.profile_shifts:
+        db.add(ProfileShift(profile_id=new_profile.id, shift_id=psh.shift_id))
+
+    db.commit()
+    db.refresh(new_profile)
+    return new_profile
+
+
 # ── Profile Staff ────────────────────────────────────────────────────
 
 @router.get("/{profile_id}/staff", response_model=list[ProfileStaffOut])
@@ -130,6 +156,28 @@ def add_staff_group_to_profile(profile_id: int, group_id: int, db: Session = Dep
             added += 1
     db.commit()
     return {"added": added}
+
+
+@router.delete("/{profile_id}/staff/remove-group/{group_id}")
+def remove_staff_group_from_profile(profile_id: int, group_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bulk-remove every staff member in a staff group from the profile."""
+    if not db.get(Profile, profile_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
+    group = db.get(StaffGroup, group_id)
+    if not group:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff group not found.")
+    staff_ids = [s.id for s in group.staff]
+    if not staff_ids:
+        return {"removed": 0}
+    removed = (
+        db.query(ProfileStaff)
+        .filter(ProfileStaff.profile_id == profile_id, ProfileStaff.staff_id.in_(staff_ids))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"removed": removed}
 
 
 @router.patch("/{profile_id}/staff/{staff_id}", response_model=ProfileStaffOut)
@@ -205,6 +253,28 @@ def add_shift_group_to_profile(profile_id: int, group_id: int, db: Session = Dep
             added += 1
     db.commit()
     return {"added": added}
+
+
+@router.delete("/{profile_id}/shifts/remove-group/{group_id}")
+def remove_shift_group_from_profile(profile_id: int, group_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bulk-remove every shift in a shift group from the profile."""
+    if not db.get(Profile, profile_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
+    group = db.get(ShiftGroup, group_id)
+    if not group:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Shift group not found.")
+    shift_ids = [s.id for s in group.shifts]
+    if not shift_ids:
+        return {"removed": 0}
+    removed = (
+        db.query(ProfileShift)
+        .filter(ProfileShift.profile_id == profile_id, ProfileShift.shift_id.in_(shift_ids))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"removed": removed}
 
 
 @router.delete("/{profile_id}/shifts/{shift_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -22,6 +22,7 @@ class DemandOut(DemandBase):
 class RosterListItem(BaseModel):
     id: int
     profile_id: int
+    profile_name: str
     name: str
     status: RosterStatus
     roster_start: date

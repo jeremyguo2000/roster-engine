@@ -47,6 +47,42 @@ services:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=/api
+      - VITE_PROXY_TARGET=http://backend:8000
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0
+
+  mcp:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - ROSTER_API_URL=http://backend:8000
+      # Service-account credentials live in THIS container only, never the agent's.
+      - ROSTER_SERVICE_USERNAME=${ROSTER_SERVICE_USERNAME}
+      - ROSTER_SERVICE_PASSWORD=${ROSTER_SERVICE_PASSWORD}
+    depends_on:
+      - backend
+    command: python -m app.mcp_server
+
   celery_worker:
     build:
       context: ./backend

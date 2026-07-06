@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RosterEngine Operator's Manual</title>
+<style>
+  :root {
+    --paper: #FBFAF7;
+    --card: #F3F1EA;
+    --ink: #1C2733;
+    --ink-soft: #4C5A68;
+    --ink-faint: #8B96A0;
+    --line: #E2DFD5;
+    --accent: #1D4E89;
+    --accent-soft: #E8EEF6;
+    --warn-bg: #F5EEDC;
+    --warn-edge: #C9A84C;
+    --crit: #A93E2E;
+    --good: #2E6B4F;
+    --code-bg: #EEECE4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171C22;
+      --card: #1F2630;
+      --ink: #E6E9ED;
+      --ink-soft: #A9B4BF;
+      --ink-faint: #6E7A86;
+      --line: #2E3742;
+      --accent: #7FA9DC;
+      --accent-soft: #22304286;
+      --warn-bg: #2A2619;
+      --warn-edge: #B0913C;
+      --crit: #D97A6A;
+      --good: #6FB893;
+      --code-bg: #12171E;
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #FBFAF7; --card: #F3F1EA; --ink: #1C2733; --ink-soft: #4C5A68;
+    --ink-faint: #8B96A0; --line: #E2DFD5; --accent: #1D4E89; --accent-soft: #E8EEF6;
+    --warn-bg: #F5EEDC; --warn-edge: #C9A84C; --crit: #A93E2E; --good: #2E6B4F; --code-bg: #EEECE4;
+  }
+  :root[data-theme="dark"] {
+    --paper: #171C22; --card: #1F2630; --ink: #E6E9ED; --ink-soft: #A9B4BF;
+    --ink-faint: #6E7A86; --line: #2E3742; --accent: #7FA9DC; --accent-soft: #22304286;
+    --warn-bg: #2A2619; --warn-edge: #B0913C; --crit: #D97A6A; --good: #6FB893; --code-bg: #12171E;
+  }
+
+  html { background: var(--paper); }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 48px 24px 96px; }
+
+  h1, h2, h3 { font-family: Charter, Georgia, "Times New Roman", serif; text-wrap: balance; line-height: 1.2; }
+  h1 { font-size: 2.3rem; margin: 0 0 8px; font-weight: 700; }
+  h1 em { font-style: italic; color: var(--accent); }
+  .subtitle { color: var(--ink-soft); margin: 0 0 8px; font-size: 1.05rem; }
+  .meta { color: var(--ink-faint); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  h2 {
+    font-size: 1.5rem; margin: 56px 0 4px; padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+  h2 .secno { color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 10px; }
+  h3 { font-size: 1.12rem; margin: 32px 0 4px; }
+  p { margin: 10px 0; }
+  .lede { color: var(--ink-soft); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  code, pre {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    font-size: 0.87em;
+  }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 14px 16px; overflow-x: auto; line-height: 1.5; margin: 12px 0;
+  }
+  pre code { background: none; padding: 0; }
+  pre .cmt { color: var(--ink-faint); }
+
+  .toc {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 18px 22px; margin: 28px 0 0;
+  }
+  .toc-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); margin: 0 0 8px; }
+  .toc ol { margin: 0; padding-left: 1.3em; columns: 2; column-gap: 32px; }
+  .toc li { margin: 3px 0; break-inside: avoid; }
+  @media (max-width: 560px) { .toc ol { columns: 1; } }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  .tablewrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 6px; }
+  th {
+    text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--ink-faint); font-weight: 600; padding: 9px 12px; background: var(--card);
+    border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { white-space: nowrap; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  dl.gloss { margin: 16px 0; }
+  dl.gloss dt {
+    font-weight: 650; margin-top: 18px;
+    font-family: Charter, Georgia, serif; font-size: 1.05rem;
+  }
+  dl.gloss dt .also { font-family: inherit; font-weight: 400; color: var(--ink-faint); font-size: 0.85rem; }
+  dl.gloss dd { margin: 4px 0 0 0; color: var(--ink-soft); }
+  dl.gloss dd strong { color: var(--ink); }
+
+  .callout {
+    border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    background: var(--accent-soft); border-radius: 0 6px 6px 0;
+    padding: 12px 16px; margin: 16px 0; font-size: 0.95rem;
+  }
+  .gotcha {
+    border: 1px solid var(--line); border-left: 3px solid var(--warn-edge);
+    background: var(--warn-bg); border-radius: 0 6px 6px 0;
+    padding: 14px 18px; margin: 18px 0;
+  }
+  .gotcha h4 { margin: 0 0 6px; font-size: 1rem; font-family: Charter, Georgia, serif; }
+  .gotcha h4 .gno { color: var(--warn-edge); font-variant-numeric: tabular-nums; margin-right: 8px; }
+  .gotcha p { margin: 6px 0; font-size: 0.95rem; color: var(--ink-soft); }
+  .gotcha p strong { color: var(--ink); }
+
+  .pill {
+    display: inline-block; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.04em;
+    padding: 1px 9px; border-radius: 99px; border: 1px solid var(--line);
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .pill.running { color: var(--accent); border-color: var(--accent); }
+  .pill.draft { color: var(--warn-edge); border-color: var(--warn-edge); }
+  .pill.approved { color: var(--good); border-color: var(--good); }
+  .pill.failed { color: var(--crit); border-color: var(--crit); }
+
+  .flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 14px 0; }
+  .flow .step {
+    background: var(--card); border: 1px solid var(--line); border-radius: 6px;
+    padding: 4px 12px; font-size: 0.88rem; white-space: nowrap;
+  }
+  .flow .arr { color: var(--ink-faint); }
+
+  ul, ol { padding-left: 1.4em; }
+  li { margin: 5px 0; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+  .foot { color: var(--ink-faint); font-size: 0.85rem; margin-top: 56px; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="meta">Operator's manual &middot; updated 6 Jul 2026</p>
+  <h1>Roster<em>Engine</em></h1>
+  <p class="subtitle">How to run, configure, and troubleshoot the roster scheduling app &mdash; written for an operator who didn't build it.</p>
+
+  <nav class="toc">
+    <p class="toc-title">Contents</p>
+    <ol>
+      <li><a href="#what">What this system is</a></li>
+      <li><a href="#run">Starting &amp; stopping</a></li>
+      <li><a href="#terms">Terminology</a></li>
+      <li><a href="#workflow">The workflow, start to finish</a></li>
+      <li><a href="#solver">How the solver thinks</a></li>
+      <li><a href="#gotchas">Gotchas</a></li>
+      <li><a href="#trouble">Troubleshooting</a></li>
+      <li><a href="#mcp">The MCP server</a></li>
+      <li><a href="#repo">Repo &amp; branch situation</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="what"><span class="secno">1</span>What this system is</h2>
+  <p class="lede">RosterEngine builds staff schedules ("rosters") automatically. You describe <em>who</em> is available, <em>what shifts</em> exist, and <em>how many people</em> you need at which hours &mdash; and a constraint solver (Google OR-Tools CP-SAT) finds an assignment that satisfies every rule while balancing fairness.</p>
+  <p>It runs as six Docker containers:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Service</th><th>Port</th><th>What it does</th></tr>
+    <tr><td><code>frontend</code></td><td class="num">5173</td><td>The web app (React). This is where you work day to day.</td></tr>
+    <tr><td><code>backend</code></td><td class="num">8000</td><td>The API (FastAPI). Swagger docs at <code>/docs</code>.</td></tr>
+    <tr><td><code>celery_worker</code></td><td class="num">&mdash;</td><td>Runs the solver in the background. Roster generation happens here, not in the API.</td></tr>
+    <tr><td><code>mcp</code></td><td class="num">8001</td><td>MCP server &mdash; lets an AI chatbot drive the roster API (optional, see &sect;8).</td></tr>
+    <tr><td><code>postgres</code></td><td class="num">5432</td><td>The database. All data lives in a Docker volume.</td></tr>
+    <tr><td><code>redis</code></td><td class="num">6379</td><td>Queue between the API and the worker.</td></tr>
+  </table></div>
+  <p>Because solving is asynchronous, generating a roster never blocks the UI: you submit it, the roster sits in <span class="pill running">running</span>, and the page polls until the worker finishes.</p>
+
+  <h2 id="run"><span class="secno">2</span>Starting &amp; stopping</h2>
+  <div class="callout">Run everything from <code>/home/guo/roster-engine-mcp</code> &mdash; <strong>not</strong> <code>/home/guo/roster-engine</code>. See &sect;9 for why there are two directories.</div>
+<pre><code>cd /home/guo/roster-engine-mcp
+
+docker compose -f docker-compose.dev.yml up -d      <span class="cmt"># start everything</span>
+docker compose -f docker-compose.dev.yml down       <span class="cmt"># stop (data survives)</span>
+docker compose -f docker-compose.dev.yml down -v    <span class="cmt"># stop AND WIPE the database</span>
+docker compose -f docker-compose.dev.yml logs -f celery_worker   <span class="cmt"># watch the solver</span>
+docker compose -f docker-compose.dev.yml ps         <span class="cmt"># service health</span></code></pre>
+  <p>One-time setup (already done on this machine): image build, database migrations (<code>alembic upgrade head</code>), and first user creation. You only repeat those after <code>down -v</code>.</p>
+  <h3>Where to log in</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Surface</th><th>URL</th><th>Credentials</th></tr>
+    <tr><td>Web app</td><td><code>http://localhost:5173</code></td><td><code>admin</code> / <code>admin123</code></td></tr>
+    <tr><td>API docs</td><td><code>http://localhost:8000/docs</code></td><td>Same &mdash; use the green <em>Authorize</em> button</td></tr>
+    <tr><td>Database</td><td><code>localhost:5432</code></td><td>In <code>.env</code> (<code>POSTGRES_PASSWORD</code>)</td></tr>
+    <tr><td>MCP service account</td><td>&mdash;</td><td>In <code>.env</code> (<code>ROSTER_SERVICE_*</code>)</td></tr>
+  </table></div>
+  <p>Every API endpoint except login requires a JWT; tokens expire after 24 hours. New users are created in-app (or via <code>docker compose &hellip; exec backend python -m app.scripts.create_user &lt;name&gt; &lt;password&gt;</code>).</p>
+
+  <h2 id="terms"><span class="secno">3</span>Terminology</h2>
+  <p class="lede">The app's vocabulary, in the order you'll meet it. The nav bar order (Shifts &rarr; Staff &rarr; Skills &rarr; Leaves &rarr; Profiles &rarr; Generate &rarr; Rosters) roughly mirrors setup order.</p>
+  <dl class="gloss">
+    <dt>Shift group <span class="also">&mdash; e.g. DSG, NSG, "Off", "Leaves"</span></dt>
+    <dd>A category of shifts with two flags that the solver cares about deeply: <strong>is work shift</strong> (does it count as working time?) and <strong>is night shift</strong> (used for rest rules and fairness). Non-work groups exist too &mdash; leave and off-duty codes live in a non-work group.</dd>
+
+    <dt>Shift <span class="also">&mdash; e.g. D078 "0700&ndash;1500"</span></dt>
+    <dd>A daily template: a short <strong>code</strong>, a start and end time, and net <strong>work minutes</strong> (duration minus breaks). Times are stored as minutes from midnight (420 = 07:00). A shift whose end is &le; its start <strong>crosses midnight</strong> &mdash; that's how night shifts are encoded, not a data error.</dd>
+
+    <dt>Skill <span class="also">&mdash; a type with values</span></dt>
+    <dd>A key&ndash;value tag, e.g. type <em>seniority</em> with values <em>senior</em>/<em>junior</em>. Attach values to staff; a demand can then require one, and only matching staff count toward it. Matching is <strong>exact</strong> &mdash; no hierarchy, "senior" does not satisfy "junior".</dd>
+
+    <dt>Staff</dt>
+    <dd>A person, in a staff group, with an <strong>employee ID</strong>, optional skills, and optional <strong>permitted shifts</strong>. If a staff member has <em>no</em> permitted-shift entries, they're allowed on <strong>every</strong> shift &mdash; an empty list means "unrestricted", not "nothing". Staff are soft-deleted (delete &rarr; restore is possible).</dd>
+
+    <dt>Leave</dt>
+    <dd>A dated absence for one staff member, carrying a shift code (default <code>AL</code>). During solving, a leave becomes a locked assignment of that code &mdash; the person can't work that day. See Gotcha 2.</dd>
+
+    <dt>Profile <span class="also">&mdash; the central object</span></dt>
+    <dd>A reusable scenario: <strong>which shifts</strong> and <strong>which staff</strong> are in play (its Shifts and Staff tabs), plus the solver's <strong>Config</strong> (fairness weights, time limit) and <strong>Rules</strong> (conditional constraints). Think "Ward A with its usual team and policies". Staff can be temporarily <em>excluded</em> from a profile without being removed. Profiles can be duplicated.</dd>
+
+    <dt>Demand</dt>
+    <dd>"On <em>this date</em>, between <em>these hours</em>, I need at least <em>N</em> people (optionally with skill X)." Demands are the only thing that makes anyone work: a day with no demand is a day nobody is scheduled.</dd>
+
+    <dt>Roster</dt>
+    <dd>One solver run over a profile + date range + demands. Status lifecycle:
+      <span class="pill running">running</span> &rarr; <span class="pill draft">draft</span> or <span class="pill failed">failed</span>; a draft you accept becomes <span class="pill approved">approved</span>. Discarding deletes a non-approved roster.</dd>
+
+    <dt>Target hours per staff</dt>
+    <dd>Set at generation time: the number of working hours <strong>each</strong> staff member must accumulate over the roster window. This is an exact-equality rule &mdash; see Gotcha 1, it's the #1 cause of failures.</dd>
+
+    <dt>Chaining / Regenerate</dt>
+    <dd>A roster can name a <strong>previous roster</strong>; the solver then carries state across the boundary &mdash; consecutive-workday counts, and who ended the last roster on a night shift (they're still asleep on day 1, and their overnight hours count toward early-morning coverage). The UI's <em>Regenerate</em> action reuses a roster's demands to re-run it.</dd>
+  </dl>
+
+  <h2 id="workflow"><span class="secno">4</span>The workflow, start to finish</h2>
+  <div class="flow">
+    <span class="step">1 Shift groups &amp; shifts</span><span class="arr">&rarr;</span>
+    <span class="step">2 Skills</span><span class="arr">&rarr;</span>
+    <span class="step">3 Staff</span><span class="arr">&rarr;</span>
+    <span class="step">4 Profile</span><span class="arr">&rarr;</span>
+    <span class="step">5 Generate</span><span class="arr">&rarr;</span>
+    <span class="step">6 Review &amp; approve</span>
+  </div>
+  <ol>
+    <li><strong>Shifts page.</strong> Create shift groups first (a work group like DSG; a night group with the night flag; one non-work group for leave/off codes), then the shifts inside them. Create an <code>AL</code> (leave) shift in the non-work group &mdash; you will need it (Gotcha 2).</li>
+    <li><strong>Skills page</strong> (optional). Only needed if demands will require specific capabilities.</li>
+    <li><strong>Staff page.</strong> Create staff groups and people; attach skills; restrict permitted shifts only where someone genuinely can't work certain shifts.</li>
+    <li><strong>Profiles page.</strong> Create a profile; on its tabs add the shifts (including <code>AL</code>) and staff, review Config weights, and add Rules if you have policies like "no work the day after a night shift".</li>
+    <li><strong>Generate page</strong> &mdash; a 4-step wizard: pick profile &amp; name &rarr; date range &amp; target hours per staff &rarr; preview which leaves will apply &rarr; enter demands per day. Submitting dispatches the solver.</li>
+    <li><strong>Rosters page.</strong> A calendar of drafts (beige) and approved rosters (green). Open the draft, inspect the timetable, then approve, discard, or regenerate. Export to Excel is available on the roster view.</li>
+  </ol>
+  <div class="callout">Rough capacity check before you generate: total demand headcount &times; shift length must be coverable by (number of staff &times; target hours), and each person's target must be reachable as a sum of whole shifts. If the arithmetic can't work, the solver will spend the whole time limit proving it can't work.</div>
+
+  <h2 id="solver"><span class="secno">5</span>How the solver thinks</h2>
+  <p class="lede">Knowing its hard rules explains almost every "why did it do that".</p>
+  <h3>Hard rules (never violated)</h3>
+  <ul>
+    <li>At most one work shift per person per day.</li>
+    <li>Every person works <strong>exactly</strong> their target hours over the window &mdash; not "up to".</li>
+    <li>Every demand window is covered by enough (skill-matching) people at every point in time. Overnight shifts from the previous day count toward early-morning coverage.</li>
+    <li>People only get shifts they're permitted.</li>
+    <li>Leaves are locked in; no work that day for that person.</li>
+    <li><strong>No demand on a day &rArr; no work shifts on that day, for anyone.</strong></li>
+    <li>Your conditional Rules, read as: <em>if staff did [trigger group] on day D, then on day D + offset, [enforce group] must equal [value]</em>. <code>*</code> is a wildcard. Example: trigger NSG = 1, offset 1, enforce * = 0 &rarr; "no shift the day after a night shift".</li>
+  </ul>
+  <h3>Soft preferences (traded off by weight)</h3>
+  <p>Among all schedules satisfying the hard rules, it minimises a weighted mix &mdash; the weights are per-profile on the Config tab:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Weight</th><th>Default</th><th>Penalises</th></tr>
+    <tr><td><code>weight_consec</code></td><td class="num">100</td><td>Long consecutive-workday streaks</td></tr>
+    <tr><td><code>weight_overstaff</code></td><td class="num">20</td><td>Uneven over-staffing across days (spread, not total)</td></tr>
+    <tr><td><code>weight_burden</code></td><td class="num">10</td><td>One person carrying an outsized night/weekend load&hellip;</td></tr>
+    <tr><td><code>weight_night</code></td><td class="num">2</td><td>&hellip;where each night shift costs this much burden</td></tr>
+    <tr><td><code>weight_weekend</code></td><td class="num">1</td><td>&hellip;and each weekend day this much</td></tr>
+    <tr><td><code>time_limit</code></td><td class="num">600 s</td><td>Wall-clock budget per solve (see Gotcha 5)</td></tr>
+  </table></div>
+  <p>Result statuses inside a draft: <code>OPTIMAL</code> means provably best under these weights; <code>FEASIBLE</code> means valid but the time limit expired before optimality was proven &mdash; both are usable schedules.</p>
+
+  <h2 id="gotchas"><span class="secno">6</span>Gotchas</h2>
+
+  <div class="gotcha"><h4><span class="gno">1</span>Target hours are exact &mdash; the top cause of "failed"</h4>
+    <p>Each person must work <em>precisely</em> the target. With only 8-hour shifts, a 36-hour target is <strong>impossible for everyone</strong> and the whole roster fails after burning the full time limit. Make the target a reachable sum of your shift lengths, and check total supply &asymp; total demand.</p></div>
+
+  <div class="gotcha"><h4><span class="gno">2</span>Leave codes must exist as shifts in the profile</h4>
+    <p>A leave stores a shift code (default <code>AL</code>). When solving, that code must resolve to a shift <strong>included in the profile</strong>. If it doesn't, the run errors out &mdash; the roster turns <span class="pill failed">failed</span> with <em>"Shift 'AL' not found"</em>. Fix: create the leave shift in a non-work group and add it to every profile's Shifts tab.</p></div>
+
+  <div class="gotcha"><h4><span class="gno">3</span>No demand = nobody works, and target hours still apply</h4>
+    <p>Days without a demand are force-blocked for everyone. So if your window is 14 days but you entered demands for 10, all target hours must fit into those 10 days &mdash; a common hidden cause of Gotcha 1. Enter a demand for every day people should work, even a minimal one.</p></div>
+
+  <div class="gotcha"><h4><span class="gno">4</span>A roster can get stuck in <span class="pill running">running</span> forever</h4>
+    <p>If Redis or the worker is down when a roster is submitted (or the worker dies mid-solve), nothing ever flips it to failed &mdash; the UI polls indefinitely. Check <code>logs -f celery_worker</code>; if the run is truly dead, <strong>Discard</strong> the roster and re-generate.</p></div>
+
+  <div class="gotcha"><h4><span class="gno">5</span>"Nothing is happening" usually means the solver is just working</h4>
+    <p>The default time budget is <strong>10 minutes per roster</strong>, and an infeasible problem uses all of it before failing. For small teams, set <code>time_limit</code> to 30&ndash;60 (seconds) in the profile Config so experiments fail fast. Also note the worker solves <strong>one roster at a time</strong> &mdash; a second submission queues behind the first.</p></div>
+
+  <div class="gotcha"><h4><span class="gno">6</span>Empty permitted-shifts means <em>all</em> shifts</h4>
+    <p>Counter-intuitive but by design: a person with no permitted-shift entries can be assigned any shift in the profile, including nights. The moment you add one entry, they're restricted to exactly the listed shifts.</p></div>
+
+  <div class="gotcha"><h4><span class="gno">7</span>Delete is forever &mdash; and works on approved rosters</h4>
+    <p><em>Discard</em> refuses to touch approved rosters, but <em>Delete</em> hard-deletes anything, approved included, with no undo. That's intentional (the UI offers it) &mdash; just be sure. The same applies to <code>down -v</code>, which erases the entire database.</p></div>
+
+  <div class="gotcha"><h4><span class="gno">8</span>Overnight shifts: end before start is correct</h4>
+    <p>A shift like N2210 stored as 22:00 &rarr; 06:00 (end &lt; start) is the night-shift convention, not bad data. The solver extends it into the next day, counts it toward next-morning coverage, and the timetable view renders both segments.</p></div>
+
+  <div class="gotcha"><h4><span class="gno">9</span>Skill matching is exact and demands with skills are additive</h4>
+    <p>A demand requiring <em>seniority: senior</em> is only satisfied by staff with exactly that value. And it's counted separately from the same window's unskilled demand &mdash; the fairness "overstaffing" measure only tracks the unskilled headcount, so skilled demands can make staffing look uneven; that's expected.</p></div>
+
+  <div class="gotcha"><h4><span class="gno">10</span>Dev quirk: solver code changes need a worker restart</h4>
+    <p>The API hot-reloads on file changes; the celery worker doesn't. If anyone edits <code>backend/solver/</code> or <code>backend/app/worker/</code>: <code>docker compose -f docker-compose.dev.yml restart celery_worker</code>, or the old code keeps running.</p></div>
+
+  <h2 id="trouble"><span class="secno">7</span>Troubleshooting</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Symptom</th><th>Likely cause &rarr; fix</th></tr>
+    <tr><td>Roster <span class="pill failed">failed</span>, error "No feasible solution found within time limit"</td><td>Constraints are contradictory &mdash; almost always Gotchas 1 or 3. Recheck target hours vs. shift lengths and demand-less days.</td></tr>
+    <tr><td>Roster <span class="pill failed">failed</span>, error "Shift 'X' not found" / "Staff 'X' not found"</td><td>A leave references a shift code missing from the profile (Gotcha 2), or leave data points at staff outside it.</td></tr>
+    <tr><td>Stuck on <span class="pill running">running</span> &gt; time limit</td><td>Worker or Redis down (Gotcha 4). <code>ps</code> then <code>logs -f celery_worker</code>; discard and re-run.</td></tr>
+    <tr><td>Everything logs you out / 401s</td><td>JWT expired (24 h). Sign in again.</td></tr>
+    <tr><td>Frontend blank or API unreachable</td><td><code>docker compose &hellip; ps</code> &mdash; if a container is down, <code>up -d</code>; check port collisions (5173, 8000, 8001, 5432, 6379) with other projects, including the stale stack in <code>/home/guo/roster-engine</code>.</td></tr>
+    <tr><td>"relation does not exist" errors from the API</td><td>Migrations not applied (fresh DB): <code>exec backend alembic upgrade head</code>.</td></tr>
+    <tr><td>Complete reset wanted</td><td><code>down -v</code>, <code>up -d</code>, migrate, re-create the admin user (&sect;2). Everything else was UI-entered and is gone.</td></tr>
+  </table></div>
+
+  <h2 id="mcp"><span class="secno">8</span>The MCP server</h2>
+  <p>The <code>mcp</code> container (port 8001, endpoint <code>http://localhost:8001/mcp</code>) exposes the roster API as MCP tools &mdash; <code>list_profiles</code>, <code>create_roster</code>, <code>get_roster_status</code>, and friends &mdash; so an MCP-capable chatbot (Claude Code, OpenClaw, &hellip;) can generate rosters conversationally. It authenticates to the backend with its own service account (<code>mcp_service</code>, password in <code>.env</code>). Full client-setup walkthrough: <code>MCP-guide.md</code> in the repo root. You can ignore this service entirely if you only use the web app.</p>
+
+  <h2 id="repo"><span class="secno">9</span>Repo &amp; branch situation</h2>
+  <p>This is the one piece of history you need: the repo's <code>main</code> branch is <strong>stale</strong> &mdash; it stops in May 2026 and contains only the backend. The complete application (frontend, MCP server, later fixes) lives on the <code>origin/mcp</code> branch, which was never merged back.</p>
+  <ul>
+    <li><code>/home/guo/roster-engine</code> &mdash; original checkout, on <code>main</code>. Backend only. Its Docker stack is stopped. Don't run from here.</li>
+    <li><code>/home/guo/roster-engine-mcp</code> &mdash; a git worktree pinned to <code>origin/mcp</code> (latest commit as of 15 Jun 2026). <strong>This is the live app.</strong> Its <code>.env</code> holds all generated credentials.</li>
+  </ul>
+  <p>Long-term, merging <code>mcp</code> into <code>main</code> (it's missing only one trivial commit from <code>main</code>) would remove this trap. Other reference docs in the repo: <code>README.md</code> (dev setup &amp; command reference), <code>MCP-guide.md</code> (chatbot integration), <code>CLAUDE.md</code> (AI-assistant notes, currently describes <code>main</code> only), and <code>documentation/</code> (architecture &amp; ER diagrams).</p>
+
+  <p class="foot">Compiled from the code on <code>origin/mcp</code> (commit <code>d587f3f</code>) and verified against a live run &mdash; including a real login, a solved roster, and the failure modes in &sect;6.</p>
+</div>
+
+</body>
+</html>

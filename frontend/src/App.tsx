@@ -1,0 +1,50 @@
+import { Routes, Route, Navigate } from "react-router-dom";
+
+import RostersPage from "./pages/RostersPage";
+import ShiftsPage from "./pages/ShiftsPage";
+import StaffPage from "./pages/StaffPage";
+import SkillsPage from "./pages/SkillsPage";
+import LeavesPage from "./pages/LeavesPage";
+import ProfilesPage from "./pages/ProfilesPage";
+import GeneratePage from "./pages/GeneratePage";
+import LoginPage from "./pages/LoginPage";
+import Nav from "./components/Nav";
+import { AuthProvider } from "./auth/AuthContext";
+import RequireAuth from "./auth/RequireAuth";
+import { ToastProvider } from "./components/Toast";
+import RosterJobWatcher from "./components/RosterJobWatcher";
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <ToastProvider>
+        <RosterJobWatcher />
+        <div className="app-shell">
+          <Nav />
+          <main className="main">
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/" element={<Navigate to="/rosters" replace />} />
+              <Route path="/rosters" element={<RequireAuth><RostersPage /></RequireAuth>} />
+              <Route path="/shifts" element={<RequireAuth><ShiftsPage /></RequireAuth>} />
+              <Route path="/staff" element={<RequireAuth><StaffPage /></RequireAuth>} />
+              <Route path="/skills" element={<RequireAuth><SkillsPage /></RequireAuth>} />
+              <Route path="/leaves" element={<RequireAuth><LeavesPage /></RequireAuth>} />
+              <Route path="/profiles" element={<RequireAuth><ProfilesPage /></RequireAuth>} />
+              <Route path="/generate" element={<RequireAuth><GeneratePage /></RequireAuth>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </main>
+        </div>
+      </ToastProvider>
+    </AuthProvider>
+  );
+}
+
+function NotFound() {
+  return (
+    <div className="empty-state">
+      <h2 className="section-title">Page not found</h2>
+    </div>
+  );
+}

@@ -78,6 +78,8 @@ Subsequent users can be created via `POST /api/auth/users` (requires auth).
 | celery_worker | —     | Solver background jobs             |
 | postgres      | 5432  | PostgreSQL 16                      |
 | redis         | 6379  | Celery broker                      |
+| frontend      | 5173  | React + Vite + TypeScript          |
+| mcp           | 8001  | MCP server                         |
 
 ## Useful commands
 

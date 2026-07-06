@@ -1,0 +1,342 @@
+import { FormEvent, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import {
+  Profile,
+  createProfile,
+  deleteProfile,
+  duplicateProfile,
+  listProfiles,
+  updateProfile,
+} from "../api/profiles";
+import { errorMessage } from "../api/client";
+import Modal from "../components/Modal";
+import { useToast } from "../components/Toast";
+import ProfileShiftsTab from "../components/profiles/ProfileShiftsTab";
+import ProfileStaffTab from "../components/profiles/ProfileStaffTab";
+import ProfileSolverTab from "../components/profiles/ProfileSolverTab";
+import ProfileRulesTab from "../components/profiles/ProfileRulesTab";
+
+const TABS = ["Shifts", "Staff", "Config", "Rules"] as const;
+type Tab = (typeof TABS)[number];
+
+export default function ProfilesPage() {
+  const profilesQ = useQuery({ queryKey: ["profiles"], queryFn: listProfiles });
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<Profile | null>(null);
+  const [duplicateSource, setDuplicateSource] = useState<Profile | null>(null);
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Profiles</h1>
+          <p className="page-sub">Solver profiles: shifts, staff inclusion, weights, conditional rules.</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>+ New Profile</button>
+      </div>
+
+      {profilesQ.isLoading && <div className="empty-state">Loading…</div>}
+      {profilesQ.data?.length === 0 && (
+        <div className="empty-state">No profiles yet. Create one to define a solver run.</div>
+      )}
+
+      <div className="stack">
+        {profilesQ.data?.map((p) => (
+          <ProfileCard
+            key={p.id}
+            profile={p}
+            onEdit={() => setEditing(p)}
+            onDuplicate={() => setDuplicateSource(p)}
+          />
+        ))}
+      </div>
+
+      {createOpen && (
+        <CreateProfileModal
+          onClose={() => setCreateOpen(false)}
+          onCreated={(p) => {
+            setCreateOpen(false);
+            setEditing(p);
+          }}
+        />
+      )}
+      {duplicateSource && (
+        <DuplicateProfileModal
+          source={duplicateSource}
+          onClose={() => setDuplicateSource(null)}
+          onDuplicated={(p) => {
+            setDuplicateSource(null);
+            setEditing(p);
+          }}
+        />
+      )}
+      {editing && <EditProfileModal profile={editing} onClose={() => setEditing(null)} />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProfileCard({
+  profile,
+  onEdit,
+  onDuplicate,
+}: {
+  profile: Profile;
+  onEdit: () => void;
+  onDuplicate: () => void;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const del = useMutation({
+    mutationFn: () => deleteProfile(profile.id),
+    onSuccess: () => {
+      toast(`Profile ${profile.name} deleted`, "success");
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+    },
+    onError: (e) => toast(errorMessage(e, "Delete failed"), "error"),
+  });
+
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(profile.name);
+  const renameMut = useMutation({
+    mutationFn: () => updateProfile(profile.id, { name: nameDraft.trim() }),
+    onSuccess: () => {
+      toast("Renamed", "success");
+      setRenaming(false);
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      qc.invalidateQueries({ queryKey: ["profile", profile.id] });
+    },
+    onError: (e) => toast(errorMessage(e, "Rename failed"), "error"),
+  });
+  function startRename() {
+    setNameDraft(profile.name);
+    setRenaming(true);
+  }
+
+  const cfg = profile.config ?? {};
+  const ruleCount = (cfg.conditional_constraints ?? []).length;
+  const canSaveRename =
+    !renameMut.isPending && !!nameDraft.trim() && nameDraft.trim() !== profile.name;
+
+  return (
+    <div className="card">
+      <div className="card-header-row">
+        <div>
+          {renaming ? (
+            <div className="row" style={{ gap: 8, alignItems: "center" }}>
+              <input
+                className="input"
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canSaveRename) renameMut.mutate();
+                  if (e.key === "Escape") setRenaming(false);
+                }}
+                style={{ width: 240, fontSize: "var(--fs-lg)", fontWeight: 500 }}
+              />
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => renameMut.mutate()}
+                disabled={!canSaveRename}
+              >
+                {renameMut.isPending ? "Saving…" : "Save"}
+              </button>
+              <button
+                className="btn btn-sm btn-ghost"
+                onClick={() => setRenaming(false)}
+                disabled={renameMut.isPending}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: "var(--fs-lg)", fontWeight: 500 }}>{profile.name}</span>
+              <button
+                className="btn btn-sm btn-ghost"
+                aria-label="Rename profile"
+                title="Rename"
+                onClick={startRename}
+                style={{ padding: "2px 6px" }}
+              >
+                ✎
+              </button>
+            </div>
+          )}
+          <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: 4 }}>
+            time_limit {cfg.time_limit ?? 600}s · overstaff w{cfg.weight_overstaff ?? 20} · consec w{cfg.weight_consec ?? 100} · {ruleCount} rule{ruleCount === 1 ? "" : "s"}
+          </div>
+        </div>
+        <div className="row-end">
+          <button className="btn btn-sm" onClick={onEdit}>Edit</button>
+          <button className="btn btn-sm btn-primary" onClick={onDuplicate}>Duplicate</button>
+          <button
+            className="btn btn-sm btn-danger"
+            onClick={() => confirm(`Delete profile ${profile.name}?`) && del.mutate()}
+            disabled={del.isPending}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CreateProfileModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (p: Profile) => void;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const mut = useMutation({
+    mutationFn: () => createProfile({ name: name.trim() }),
+    onSuccess: (p) => {
+      toast(`Profile ${p.name} created`, "success");
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      onCreated(p);
+    },
+    onError: (e) => toast(errorMessage(e, "Create failed"), "error"),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (name.trim()) mut.mutate();
+  }
+
+  return (
+    <Modal open onClose={onClose} title="New Profile" size="md">
+      <form onSubmit={onSubmit} className="stack">
+        <div className="field">
+          <label className="label">Name</label>
+          <input
+            className="input"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <span className="field-hint">Add shifts, staff and config in the next step.</span>
+        </div>
+        <div className="row-end">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={mut.isPending || !name.trim()}>
+            {mut.isPending ? "Creating…" : "Create & Configure"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DuplicateProfileModal({
+  source,
+  onClose,
+  onDuplicated,
+}: {
+  source: Profile;
+  onClose: () => void;
+  onDuplicated: (p: Profile) => void;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [name, setName] = useState(`${source.name} (copy)`);
+  const mut = useMutation({
+    mutationFn: () => duplicateProfile(source.id, { name: name.trim() }),
+    onSuccess: (p) => {
+      toast(`Profile ${p.name} created`, "success");
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      onDuplicated(p);
+    },
+    onError: (e) => toast(errorMessage(e, "Duplicate failed"), "error"),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (name.trim()) mut.mutate();
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Duplicate Profile — ${source.name}`} size="md">
+      <form onSubmit={onSubmit} className="stack">
+        <div className="field">
+          <label className="label">New profile name</label>
+          <input
+            className="input"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <span className="field-hint">Shifts, staff and config will be copied from {source.name}.</span>
+        </div>
+        <div className="row-end">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={mut.isPending || !name.trim()}>
+            {mut.isPending ? "Duplicating…" : "Duplicate & Configure"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function EditProfileModal({ profile, onClose }: { profile: Profile; onClose: () => void }) {
+  const [tab, setTab] = useState<Tab>("Shifts");
+  // Refetch the profile so updates to config (Config/Rules tabs) reflect immediately.
+  const profileQ = useQuery({
+    queryKey: ["profile", profile.id],
+    queryFn: () => listProfiles().then((all) => all.find((p) => p.id === profile.id) ?? profile),
+    initialData: profile,
+    staleTime: 0,
+  });
+  const current = profileQ.data ?? profile;
+
+  return (
+    <Modal open onClose={onClose} title={`Edit Profile — ${current.name}`} size="wide">
+      <div
+        role="tablist"
+        style={{
+          display: "flex",
+          gap: 4,
+          marginBottom: 16,
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        {TABS.map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            className={`btn btn-sm ${tab === t ? "btn-primary" : "btn-ghost"}`}
+            style={{
+              borderRadius: "6px 6px 0 0",
+              borderBottomColor: tab === t ? "var(--primary)" : "transparent",
+            }}
+            onClick={() => setTab(t)}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === "Shifts" && <ProfileShiftsTab profile={current} />}
+      {tab === "Staff" && <ProfileStaffTab profile={current} />}
+      {tab === "Config" && <ProfileSolverTab profile={current} />}
+      {tab === "Rules" && <ProfileRulesTab profile={current} />}
+    </Modal>
+  );
+}
