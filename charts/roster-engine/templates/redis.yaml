@@ -1,0 +1,57 @@
+# Redis 7 — Celery job queue only, no persistence (matches the compose setup;
+# an in-flight solve lost to a redis restart just leaves a roster in
+# status=running, which the operator can discard and re-run).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "roster-engine.redisHost" . }}
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
+  selector:
+    {{- include "roster-engine.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "roster-engine.redisHost" . }}
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "roster-engine.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "roster-engine.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          {{- with .Values.redis.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

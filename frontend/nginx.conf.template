@@ -1,0 +1,45 @@
+# Rendered to /etc/nginx/conf.d/default.conf at container start; ${BACKEND_URL}
+# and ${MCP_URL} are replaced with the env vars of the same name. nginx's own
+# runtime variables ($host, $uri, ...) are left untouched because the entrypoint
+# only substitutes variables that exist in the environment.
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # REST API and the operator documentation are served by the backend.
+    location /api {
+        proxy_pass ${BACKEND_URL};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    location /documentation {
+        proxy_pass ${BACKEND_URL};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # MCP server (Streamable HTTP) — long-lived streaming responses, so
+    # buffering must be off.
+    location /mcp {
+        proxy_pass ${MCP_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+    }
+
+    # Everything else is the SPA; unknown paths fall back to index.html so
+    # client-side routing works on hard refresh.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

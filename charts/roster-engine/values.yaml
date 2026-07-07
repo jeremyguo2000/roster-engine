@@ -1,0 +1,76 @@
+# Default values for roster-engine.
+#
+# Three values are REQUIRED and have no defaults (install fails with a clear
+# error if unset): auth.secretKey, postgres.password, mcp.servicePassword.
+
+image:
+  # Registry prefix for the two app images, e.g. "harbor.example.com/roster".
+  # Leave empty if the repository names below are already fully qualified or
+  # the images are loaded directly onto the nodes.
+  registry: ""
+  backendRepository: roster-backend
+  frontendRepository: roster-frontend
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+  # e.g. pullSecrets: [{ name: regcred }]
+  pullSecrets: []
+
+auth:
+  # JWT signing key. Generate with: openssl rand -hex 32
+  secretKey: ""
+  accessTokenExpireMinutes: 1440
+
+postgres:
+  user: roster
+  password: ""
+  database: roster_engine
+  persistence:
+    size: 5Gi
+    # Empty string uses the cluster's default StorageClass.
+    storageClassName: ""
+  resources: {}
+
+redis:
+  resources: {}
+
+backend:
+  resources: {}
+
+worker:
+  # Solver processes per worker pod. Scale solves by adding replicas, not
+  # concurrency — CP-SAT saturates CPU per solve.
+  concurrency: 1
+  replicas: 1
+  resources: {}
+
+mcp:
+  enabled: true
+  # Service account the MCP server logs in with. The user must be created
+  # after install (see DEPLOY.md) with exactly these credentials.
+  serviceUsername: svc-mcp
+  servicePassword: ""
+  resources: {}
+
+frontend:
+  service:
+    # Set to NodePort for quick access on clusters without an ingress controller.
+    type: ClusterIP
+  resources: {}
+
+# Standard Kubernetes Ingress (for non-PCAI clusters). All traffic goes to the
+# frontend, whose nginx proxies /api, /documentation and /mcp internally.
+ingress:
+  enabled: false
+  className: ""
+  host: roster.example.com
+  annotations: {}
+  tls: []
+
+# HPE PCAI / AI Essentials integration. When enabled, an Istio VirtualService
+# under templates/ezua/ exposes the app through the platform's gateway.
+# ${DOMAIN_NAME} is substituted by AI Essentials at import time.
+ezua:
+  enabled: false
+  virtualService:
+    endpoint: "roster.${DOMAIN_NAME}"
+    istioGateway: "istio-system/ezaf-gateway"

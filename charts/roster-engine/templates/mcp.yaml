@@ -1,0 +1,77 @@
+{{- if .Values.mcp.enabled }}
+# MCP server — exposes roster operations to AI clients over Streamable HTTP.
+# Same image as the backend; talks to the backend's REST API using the
+# service-account credentials from the release secret.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "roster-engine.fullname" . }}-mcp
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    {{- include "roster-engine.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "roster-engine.fullname" . }}-mcp
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "roster-engine.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mcp
+  template:
+    metadata:
+      labels:
+        {{- include "roster-engine.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mcp
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- include "roster-engine.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: mcp
+          image: {{ include "roster-engine.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-m", "app.mcp_server"]
+          ports:
+            - containerPort: 8000
+          env:
+            - name: ROSTER_API_URL
+              value: http://{{ include "roster-engine.backendHost" . }}:8000
+            - name: ROSTER_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: ROSTER_SERVICE_USERNAME
+            - name: ROSTER_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: ROSTER_SERVICE_PASSWORD
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          {{- with .Values.mcp.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

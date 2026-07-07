@@ -1,0 +1,25 @@
+{{- if .Values.ezua.enabled }}
+# HPE PCAI / AI Essentials endpoint. The platform's "Import Framework" flow
+# looks for this VirtualService to publish the app on the cluster gateway;
+# ${DOMAIN_NAME} in the endpoint value is substituted by the platform.
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "roster-engine.fullname" . }}
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+spec:
+  gateways:
+    - {{ .Values.ezua.virtualService.istioGateway }}
+  hosts:
+    - {{ .Values.ezua.virtualService.endpoint | quote }}
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ include "roster-engine.fullname" . }}-frontend.{{ .Release.Namespace }}.svc.cluster.local
+            port:
+              number: 80
+{{- end }}

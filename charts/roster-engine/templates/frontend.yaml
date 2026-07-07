@@ -1,0 +1,66 @@
+# nginx serving the built React app; also the single entry point that proxies
+# /api, /documentation and /mcp to the internal services.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "roster-engine.fullname" . }}-frontend
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  type: {{ .Values.frontend.service.type }}
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http
+  selector:
+    {{- include "roster-engine.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "roster-engine.fullname" . }}-frontend
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "roster-engine.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        {{- include "roster-engine.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: frontend
+    spec:
+      {{- include "roster-engine.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: frontend
+          image: {{ include "roster-engine.frontendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: BACKEND_URL
+              value: http://{{ include "roster-engine.backendHost" . }}:8000
+            - name: MCP_URL
+              value: http://{{ include "roster-engine.fullname" . }}-mcp:8000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          {{- with .Values.frontend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

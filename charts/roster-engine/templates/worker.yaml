@@ -1,0 +1,41 @@
+# Celery worker running the OR-Tools solver. Same image as the backend,
+# different command. Scale solves with worker.replicas.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "roster-engine.fullname" . }}-worker
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "roster-engine.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "roster-engine.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- include "roster-engine.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: worker
+          image: {{ include "roster-engine.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - celery
+            - -A
+            - app.worker.celery_app
+            - worker
+            - --loglevel=info
+            - --concurrency={{ .Values.worker.concurrency }}
+          env:
+            {{- include "roster-engine.appEnv" . | nindent 12 }}
+          {{- with .Values.worker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

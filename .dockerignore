@@ -1,0 +1,7 @@
+# Applies to builds run from the repo root (the backend image).
+.git
+frontend
+charts
+scripts
+**/__pycache__
+**/*.pyc

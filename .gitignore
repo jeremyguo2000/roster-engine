@@ -40,3 +40,6 @@ frontend/.env.local
 .playwright-mcp/
 CLAUDE.md
 .verify/
+
+# Packaged Helm charts (regenerate with helm package)
+charts/*.tgz

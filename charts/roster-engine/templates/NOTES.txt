@@ -1,0 +1,33 @@
+roster-engine {{ .Chart.Version }} installed as release "{{ .Release.Name }}".
+
+1. Wait for everything to come up (first start pulls images and runs DB migrations):
+
+   kubectl -n {{ .Release.Namespace }} get pods -w
+
+2. FIRST INSTALL ONLY — create the initial users (the API refuses all requests
+   without a login, so this is done via CLI inside the backend pod):
+
+   # your own admin login
+   kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "roster-engine.backendHost" . }} -- \
+     python -m app.scripts.create_user <admin-username> <admin-password>
+{{- if .Values.mcp.enabled }}
+
+   # service account for the MCP server (MUST match mcp.serviceUsername/servicePassword)
+   kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "roster-engine.backendHost" . }} -- \
+     python -m app.scripts.create_user {{ .Values.mcp.serviceUsername }} <mcp-service-password>
+{{- end }}
+
+3. Open the app:
+{{- if .Values.ingress.enabled }}
+
+   http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}/
+{{- else if .Values.ezua.enabled }}
+
+   Via the PCAI endpoint configured in ezua.virtualService.endpoint.
+{{- else }}
+
+   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "roster-engine.fullname" . }}-frontend 8080:80
+   then browse to http://localhost:8080
+{{- end }}
+
+Full runbook: DEPLOY.md in the repository root.

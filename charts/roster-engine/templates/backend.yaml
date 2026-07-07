@@ -1,0 +1,72 @@
+# FastAPI backend. Runs alembic migrations on startup, then uvicorn.
+# Single replica + Recreate so two pods never run migrations concurrently.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "roster-engine.backendHost" . }}
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    {{- include "roster-engine.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "roster-engine.backendHost" . }}
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "roster-engine.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "roster-engine.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- include "roster-engine.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: backend
+          image: {{ include "roster-engine.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c"]
+          # If postgres isn't up yet, alembic fails, the container exits and
+          # kubernetes restarts it — no init-container dance needed.
+          args:
+            - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+          ports:
+            - containerPort: 8000
+          env:
+            {{- include "roster-engine.appEnv" . | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+          {{- with .Values.backend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
