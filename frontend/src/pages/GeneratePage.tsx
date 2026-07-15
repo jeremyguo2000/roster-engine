@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { listProfiles } from "../api/profiles";
+import { listProfiles, listProfileShifts, listProfileStaff } from "../api/profiles";
 import { listRosters, createRoster } from "../api/rosters";
+import { listShifts } from "../api/shifts";
 import { listLeaves } from "../api/staff";
 import { listSkillTypes } from "../api/skills";
 import { createDemand, DemandInput, Demand } from "../api/demands";
@@ -12,6 +13,7 @@ import { useToast } from "../components/Toast";
 import Calendar from "../components/Calendar";
 import { hhmmToMin, minToHHMM } from "../lib/time";
 import { addDaysIso, dateRange, isoDate, pickRosterForDate } from "../lib/calendar";
+import { DemandRow, feasibilityHints } from "../lib/feasibility";
 
 interface DemandDraft {
   start: string;
@@ -157,13 +159,58 @@ export default function GeneratePage() {
     return rows;
   }, [dates, demands]);
 
-  const formValid =
-    profileId !== null &&
-    name.trim().length > 0 &&
-    rosterStart.length === 10 &&
-    numDays > 0 &&
-    targetWorkHours > 0 &&
-    allDemandRows.length > 0;
+  // Feasibility hints — advisory cross-checks of target/credits/demands/leaves
+  const shiftsQ = useQuery({ queryKey: ["shifts"], queryFn: () => listShifts() });
+  const profileShiftsQ = useQuery({
+    queryKey: ["profiles", profileId, "shifts"],
+    queryFn: () => listProfileShifts(profileId!),
+    enabled: profileId !== null,
+  });
+  const profileStaffQ = useQuery({
+    queryKey: ["profiles", profileId, "staff"],
+    queryFn: () => listProfileStaff(profileId!),
+    enabled: profileId !== null,
+  });
+
+  const hints = useMemo(() => {
+    if (!shiftsQ.data || !profileShiftsQ.data || !profileStaffQ.data) return [];
+    const inProfile = new Set(profileShiftsQ.data.map((e) => e.shift_id));
+    const activeStaff = profileStaffQ.data.filter((e) => !e.excluded);
+    const activeStaffIds = new Set(activeStaff.map((e) => e.staff_id));
+    const rows: DemandRow[] = [];
+    for (const { date, demand } of allDemandRows) {
+      try {
+        rows.push({
+          date,
+          start_min: hhmmToMin(demand.start),
+          end_min: hhmmToMin(demand.end),
+          headcount: demand.headcount || 0,
+          skill_value_id: demand.skill_value_id,
+        });
+      } catch {
+        // skip rows whose time input is still being typed
+      }
+    }
+    return feasibilityHints({
+      dates,
+      targetWorkMin: Math.round(targetWorkHours * 60),
+      profileShifts: shiftsQ.data.filter((s) => inProfile.has(s.id)),
+      staffCount: activeStaff.length,
+      demands: rows,
+      leaves: (leavesQ.data ?? [])
+        .filter((l) => activeStaffIds.has(l.staff_id))
+        .map((l) => ({ date: l.date, shift_code: l.shift_code })),
+    });
+  }, [shiftsQ.data, profileShiftsQ.data, profileStaffQ.data, allDemandRows, dates, targetWorkHours, leavesQ.data]);
+
+  const missingRequirements: string[] = [];
+  if (profileId === null) missingRequirements.push("pick a profile");
+  if (name.trim().length === 0) missingRequirements.push("name the roster");
+  if (rosterStart.length !== 10 || numDays <= 0) missingRequirements.push("choose a date range");
+  if (targetWorkHours <= 0) missingRequirements.push("set target hours per staff");
+  if (allDemandRows.length === 0) missingRequirements.push("add at least one demand");
+
+  const formValid = missingRequirements.length === 0;
 
   const generate = useMutation({
     mutationFn: async () => {
@@ -216,13 +263,20 @@ export default function GeneratePage() {
           <h1 className="page-title">Generate Roster</h1>
           <p className="page-sub">Configure the solver inputs, then dispatch.</p>
         </div>
-        <button
-          className="btn btn-primary btn-lg"
-          onClick={() => generate.mutate()}
-          disabled={!formValid || generate.isPending}
-        >
-          {generate.isPending ? "Generating…" : "Generate"}
-        </button>
+        <div style={{ textAlign: "right" }}>
+          <button
+            className="btn btn-primary btn-lg"
+            onClick={() => generate.mutate()}
+            disabled={!formValid || generate.isPending}
+          >
+            {generate.isPending ? "Generating…" : "Generate"}
+          </button>
+          {!formValid && (
+            <p className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+              Still need to {missingRequirements.join(", ")}.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="stack">
@@ -329,7 +383,7 @@ export default function GeneratePage() {
             </div>
           )}
           <p className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 8 }}>
-            Read-only preview — manage leaves on the Staff page.
+            Read-only preview — manage leaves on the Leaves page.
           </p>
         </Step>
 
@@ -410,7 +464,33 @@ export default function GeneratePage() {
           </div>
         </Step>
 
-        <div className="row" style={{ justifyContent: "flex-end" }}>
+        {allDemandRows.length > 0 && hints.length > 0 && (
+          <section
+            className="card"
+            style={{ background: "var(--status-draft-bg)", borderLeft: "4px solid var(--status-draft-ink)" }}
+          >
+            <h3 className="section-title" style={{ marginBottom: 8, fontSize: "var(--fs-lg)" }}>
+              Feasibility check
+            </h3>
+            <ul style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 6 }}>
+              {hints.map((h, i) => (
+                <li key={i} style={{ fontSize: "var(--fs-sm)" }}>{h}</li>
+              ))}
+            </ul>
+            <p className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 8, marginBottom: 0 }}>
+              Advisory only — you can still generate, but the solver is likely to come back infeasible.
+            </p>
+          </section>
+        )}
+
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <span className="muted" style={{ fontSize: "var(--fs-sm)" }}>
+            {!formValid
+              ? `Still need to ${missingRequirements.join(", ")}.`
+              : hints.length === 0 && allDemandRows.length > 0
+                ? "✓ Basic feasibility checks pass."
+                : ""}
+          </span>
           <button
             className="btn btn-primary btn-lg"
             onClick={() => generate.mutate()}
