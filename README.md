@@ -1,5 +1,11 @@
 # Roster Engine
 
+Staff roster generation on OR-Tools CP-SAT: FastAPI backend, Celery solver
+worker, React frontend, and an MCP server. See [DESIGN.md](DESIGN.md) for the
+operator workflow, planned cancellation handling, and future directions;
+[documentation/operators-manual.html](documentation/operators-manual.html)
+for end-user instructions.
+
 ## Dev Setup
 
 ### 1. Clone and configure environment
