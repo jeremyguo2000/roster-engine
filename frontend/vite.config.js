@@ -24,6 +24,11 @@ export default defineConfig(({ mode }) => {
                     target: proxyTarget,
                     changeOrigin: true,
                 },
+                // Mirrors the prod nginx proxy so the in-app "Guide" link works in dev too.
+                "/documentation": {
+                    target: proxyTarget,
+                    changeOrigin: true,
+                },
             },
         },
         test: {

@@ -31,7 +31,16 @@ export default function RosterJobWatcher() {
     for (const id of prevIds.current) {
       if (!currentIds.has(id)) finished.push(id);
     }
+    const started: number[] = [];
+    for (const id of currentIds) {
+      if (!prevIds.current.has(id)) started.push(id);
+    }
     prevIds.current = currentIds;
+
+    if (started.length > 0) {
+      // A roster started running outside this tab (e.g. via MCP) — refresh so it appears in the list.
+      qc.invalidateQueries({ queryKey: ["rosters"] });
+    }
 
     if (finished.length === 0) return;
 

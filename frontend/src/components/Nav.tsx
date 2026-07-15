@@ -32,6 +32,14 @@ export default function Nav() {
         )}
         {user && (
           <>
+            <a
+              className="nav-link"
+              href="/documentation/operators-manual.html"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Guide
+            </a>
             <span className="nav-user">{user.username}</span>
             <button className="btn btn-sm" onClick={logout}>Sign out</button>
           </>

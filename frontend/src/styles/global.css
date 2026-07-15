@@ -533,3 +533,77 @@ input, select, textarea { font-family: inherit; }
 .spacer { flex: 1; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-4); }
+
+/* =========================================================
+   Workflow guide (setup checklist on the Rosters landing page)
+   ========================================================= */
+.workflow-guide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--r-lg);
+  padding: var(--s-4) var(--s-5);
+  margin-bottom: var(--s-6);
+}
+
+.workflow-guide-steps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+}
+
+.workflow-step-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.workflow-step-arr {
+  color: var(--muted);
+  margin: 0 var(--s-2);
+}
+
+.workflow-step {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-md);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+a.workflow-step:hover { background: var(--hover); text-decoration: none; }
+.workflow-step.current { color: var(--primary); background: var(--primary-soft); }
+
+.workflow-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.workflow-step-dot.done {
+  background: var(--status-approved-bg);
+  border-color: var(--status-approved-ink);
+  color: var(--status-approved-ink);
+}
+.workflow-step-dot.current {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.workflow-guide-link {
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}

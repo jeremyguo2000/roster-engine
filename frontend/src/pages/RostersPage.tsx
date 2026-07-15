@@ -22,6 +22,7 @@ import RosterSummary from "../components/RosterSummary";
 import Calendar from "../components/Calendar";
 import DayTimetable from "../components/DayTimetable";
 import RangeTimetable from "../components/RangeTimetable";
+import WorkflowGuide from "../components/WorkflowGuide";
 
 export default function RostersPage() {
   const rostersQ = useQuery({
@@ -61,6 +62,8 @@ export default function RostersPage() {
         </div>
         <Link to="/generate" className="btn btn-primary">+ Generate Roster</Link>
       </div>
+
+      <WorkflowGuide />
 
       {rostersQ.isLoading && <div className="empty-state">Loading…</div>}
 
@@ -181,8 +184,6 @@ function FailedCard({ roster }: { roster: Roster }) {
     queryFn: () => getRoster(roster.id),
   });
   const errorMsg = detailQ.data?.result?.error;
-  const tooltip = errorMsg
-    ?? (detailQ.isLoading ? "Loading error…" : "No error message recorded.");
 
   const del = useMutation({
     mutationFn: () => discardRoster(roster.id),
@@ -199,15 +200,15 @@ function FailedCard({ roster }: { roster: Roster }) {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: "var(--fs-lg)", fontWeight: 500 }}>{roster.name}</span>
-            <span
-              className="badge badge-failed"
-              title={tooltip}
-              style={{ cursor: errorMsg ? "help" : "default" }}
-            >
-              Failed
-            </span>
+            <span className="badge badge-failed">Failed</span>
           </div>
           <RosterMeta roster={roster} />
+          <div
+            className={errorMsg ? undefined : "muted"}
+            style={{ fontSize: "var(--fs-sm)", marginTop: 4, color: errorMsg ? "var(--status-failed-ink)" : undefined }}
+          >
+            {detailQ.isLoading ? "Loading error…" : errorMsg ?? "No error message recorded."}
+          </div>
         </div>
         <div className="row-end">
           <RegenerateButton roster={roster} />
