@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { listProfiles, listProfileShifts, listProfileStaff } from "../api/profiles";
+import { listProfiles, listProfileShifts, listProfileStaff, updateProfile } from "../api/profiles";
 import { listRosters, createRoster } from "../api/rosters";
 import { listShifts } from "../api/shifts";
 import { listLeaves } from "../api/staff";
@@ -13,7 +13,7 @@ import { useToast } from "../components/Toast";
 import Calendar from "../components/Calendar";
 import { hhmmToMin, minToHHMM } from "../lib/time";
 import { addDaysIso, dateRange, isoDate, pickRosterForDate } from "../lib/calendar";
-import { DemandRow, feasibilityHints } from "../lib/feasibility";
+import { DemandRow, dominantCredit, feasibilityHints, suggestSetup } from "../lib/feasibility";
 
 interface DemandDraft {
   start: string;
@@ -203,6 +203,96 @@ export default function GeneratePage() {
     });
   }, [shiftsQ.data, profileShiftsQ.data, profileStaffQ.data, allDemandRows, dates, targetWorkHours, leavesQ.data]);
 
+  const canSuggest =
+    !!shiftsQ.data && !!profileShiftsQ.data && !!profileStaffQ.data && dates.length > 0;
+
+  // ── Quick templates: a daily demand pattern + target stored on the profile ──
+  const qc = useQueryClient();
+  const selectedProfile = profilesQ.data?.find((p) => p.id === profileId) ?? null;
+  const template = selectedProfile?.config.generate_template ?? null;
+
+  const saveTemplate = useMutation({
+    mutationFn: async () => {
+      if (!selectedProfile) throw new Error("Pick a profile first.");
+      const rows = (demands[dates[0]] ?? []).map((d) => ({
+        start_min: hhmmToMin(d.start),
+        end_min: hhmmToMin(d.end),
+        headcount: d.headcount,
+        skill_value_id: d.skill_value_id,
+      }));
+      if (rows.length === 0) throw new Error("Add demands to day 1 first.");
+      return updateProfile(selectedProfile.id, {
+        config: {
+          ...selectedProfile.config,
+          generate_template: {
+            // Per-day so the template scales to any window length on apply
+            target_work_min_per_day: Math.round(targetWorkHours * 60) / Math.max(dates.length, 1),
+            rows,
+          },
+        },
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      toast(`Day-1 pattern and target saved as ${selectedProfile?.name} template`, "success");
+    },
+    onError: (e) => toast(errorMessage(e, "Could not save template"), "error"),
+  });
+
+  function applyTemplate() {
+    if (!template || dates.length === 0) return;
+    if (typeof template.target_work_min_per_day === "number") {
+      // Scale to this window, snapped to the profile's shift credit so the
+      // exact-hours constraint stays satisfiable.
+      let targetMin = template.target_work_min_per_day * dates.length;
+      const inProfile = new Set((profileShiftsQ.data ?? []).map((e) => e.shift_id));
+      const credit = dominantCredit((shiftsQ.data ?? []).filter((s) => inProfile.has(s.id)));
+      if (credit) targetMin = Math.max(credit, Math.round(targetMin / credit) * credit);
+      setTargetWorkHours(parseFloat((targetMin / 60).toFixed(2)));
+    }
+    const byDate: Record<string, DemandDraft[]> = {};
+    for (const d of dates) {
+      byDate[d] = template.rows.map((r) => ({
+        start: minToHHMM(r.start_min),
+        end: minToHHMM(r.end_min),
+        headcount: r.headcount,
+        skill_value_id: r.skill_value_id,
+      }));
+    }
+    setDemands(byDate);
+    toast(`Template applied to ${dates.length} day${dates.length === 1 ? "" : "s"}`, "success");
+  }
+
+  function suggestFromProfile() {
+    if (!shiftsQ.data || !profileShiftsQ.data || !profileStaffQ.data) return;
+    const inProfile = new Set(profileShiftsQ.data.map((e) => e.shift_id));
+    const setup = suggestSetup({
+      dates,
+      profileShifts: shiftsQ.data.filter((s) => inProfile.has(s.id)),
+      staffCount: profileStaffQ.data.filter((e) => !e.excluded).length,
+    });
+    if (!setup) {
+      toast("Add work shifts and staff to the profile first.", "error");
+      return;
+    }
+    setTargetWorkHours(parseFloat((setup.targetWorkMin / 60).toFixed(2)));
+    const byDate: Record<string, DemandDraft[]> = {};
+    for (const d of dates) byDate[d] = [];
+    for (const r of setup.demands) {
+      byDate[r.date].push({
+        start: minToHHMM(r.start_min),
+        end: minToHHMM(r.end_min),
+        headcount: r.headcount,
+        skill_value_id: null,
+      });
+    }
+    setDemands(byDate);
+    toast(
+      `Suggested demands for ${dates.length} day${dates.length === 1 ? "" : "s"} and a ${(setup.targetWorkMin / 60).toFixed(1)}h target`,
+      "success",
+    );
+  }
+
   const missingRequirements: string[] = [];
   if (profileId === null) missingRequirements.push("pick a profile");
   if (name.trim().length === 0) missingRequirements.push("name the roster");
@@ -391,10 +481,32 @@ export default function GeneratePage() {
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
             <span className="muted" style={{ fontSize: "var(--fs-sm)" }}>
               Headcount requirements per day. Solver covers every minute of every demand window.
+              “Suggest” fills every day from the profile’s shifts and sets a matching target.
             </span>
-            <button className="btn btn-sm" onClick={copyFirstToAll} disabled={dates.length < 2}>
-              Copy day 1 to all days
-            </button>
+            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btn-sm btn-primary" onClick={suggestFromProfile} disabled={!canSuggest}>
+                Suggest demands &amp; target
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={applyTemplate}
+                disabled={!template || dates.length === 0}
+                title={template ? "Fill every day from this profile's saved template" : "No template saved on this profile yet"}
+              >
+                Apply template
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={() => saveTemplate.mutate()}
+                disabled={(demands[dates[0]] ?? []).length === 0 || saveTemplate.isPending}
+                title="Save day 1's demands + the current target to this profile for one-click reuse"
+              >
+                Save as template
+              </button>
+              <button className="btn btn-sm" onClick={copyFirstToAll} disabled={dates.length < 2}>
+                Copy day 1 to all days
+              </button>
+            </div>
           </div>
           <div className="stack">
             {dates.map((d) => (

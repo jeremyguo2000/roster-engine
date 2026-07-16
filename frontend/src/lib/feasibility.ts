@@ -75,6 +75,86 @@ function checkpoints(demand: DemandRow, workShifts: Shift[]): number[] {
   return [...points];
 }
 
+export interface SuggestedSetup {
+  targetWorkMin: number;
+  demands: DemandRow[];
+}
+
+/** Most common work_min among a profile's work shifts, or null if none. */
+export function dominantCredit(profileShifts: Shift[]): number | null {
+  const counts = new Map<number, number>();
+  for (const s of profileShifts) {
+    if (s.group.is_work_shift && s.work_min > 0) {
+      counts.set(s.work_min, (counts.get(s.work_min) ?? 0) + 1);
+    }
+  }
+  if (counts.size === 0) return null;
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
+/**
+ * Derive a feasible starting setup from a profile: a reachable target
+ * (≈5 duty days per 7, times the dominant shift credit) and one demand row
+ * per shift group per day over the group's "core window" — the hours every
+ * shift in the group covers, so coverage holds no matter which shifts the
+ * solver picks. Headcounts use ~80% of average daily supply, leaving slack.
+ * Returns null when the profile has no work shifts or no staff.
+ */
+export function suggestSetup(input: {
+  dates: string[];
+  profileShifts: Shift[];
+  staffCount: number;
+}): SuggestedSetup | null {
+  const { dates, profileShifts, staffCount } = input;
+  const workShifts = profileShifts.filter((s) => s.group.is_work_shift);
+  if (dates.length === 0 || staffCount <= 0 || workShifts.length === 0) return null;
+
+  // Dominant credit (most common work_min) → duty-day count → target
+  const credit = dominantCredit(workShifts);
+  if (credit === null) return null;
+  const dutyDays = Math.max(1, Math.min(dates.length, Math.round((dates.length * 5) / 7)));
+  const targetWorkMin = dutyDays * credit;
+
+  // Core window per shift group (max start → min normalized end)
+  const byGroup = new Map<string, Shift[]>();
+  for (const s of workShifts) {
+    const list = byGroup.get(s.group.code) ?? [];
+    list.push(s);
+    byGroup.set(s.group.code, list);
+  }
+  const windows: { start: number; end: number; night: boolean }[] = [];
+  for (const shifts of byGroup.values()) {
+    const start = Math.max(...shifts.map((s) => s.start_min));
+    const end = Math.min(...shifts.map((s) => (s.end_min <= s.start_min ? s.end_min + 1440 : s.end_min)));
+    if (end <= start) continue; // shifts in this group share no common hours
+    windows.push({ start, end: end % 1440, night: shifts[0].group.is_night_shift });
+  }
+  if (windows.length === 0) return null;
+
+  // Headcounts: ~80% of average staff on duty per day, nights ≈ 20% of that
+  const supplyPerDay = (staffCount * dutyDays) / dates.length;
+  const budget = Math.max(windows.length, Math.floor(supplyPerDay * 0.8));
+  const nightWindows = windows.filter((w) => w.night);
+  const dayWindows = windows.filter((w) => !w.night);
+  const nightHC = nightWindows.length > 0 ? Math.max(1, Math.round((budget * 0.2) / nightWindows.length)) : 0;
+  const dayBudget = budget - nightHC * nightWindows.length;
+  const dayHC = dayWindows.length > 0 ? Math.max(1, Math.floor(dayBudget / dayWindows.length)) : 0;
+
+  const demands: DemandRow[] = [];
+  for (const date of dates) {
+    for (const w of windows) {
+      demands.push({
+        date,
+        start_min: w.start,
+        end_min: w.end,
+        headcount: w.night ? nightHC : dayHC,
+        skill_value_id: null,
+      });
+    }
+  }
+  return { targetWorkMin, demands };
+}
+
 export function feasibilityHints(input: FeasibilityInput): string[] {
   const { dates, targetWorkMin, profileShifts, staffCount, demands, leaves } = input;
   const hints: string[] = [];

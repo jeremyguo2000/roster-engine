@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Shift, ShiftGroup } from "../api/shifts";
-import { DemandRow, feasibilityHints, FeasibilityInput } from "./feasibility";
+import { DemandRow, feasibilityHints, FeasibilityInput, suggestSetup } from "./feasibility";
 
 const dsg: ShiftGroup = { id: 1, code: "DSG", is_work_shift: true, is_night_shift: false, color: "" };
 const nsg: ShiftGroup = { id: 2, code: "NSG", is_work_shift: true, is_night_shift: true, color: "" };
@@ -109,5 +109,46 @@ describe("feasibilityHints", () => {
       base({ leaves: [{ date: "2026-09-01", shift_code: "MC" }] }),
     );
     expect(hints).toEqual([]);
+  });
+});
+
+describe("suggestSetup", () => {
+  const profileShifts = [day, evening, night, al];
+
+  it("suggests a target that is a multiple of the shift credit", () => {
+    const setup = suggestSetup({ dates, profileShifts, staffCount: 10 })!;
+    expect(setup.targetWorkMin % 440).toBe(0);
+    expect(setup.targetWorkMin / 440).toBeLessThanOrEqual(dates.length);
+  });
+
+  it("puts at least one demand on every day", () => {
+    const setup = suggestSetup({ dates, profileShifts, staffCount: 10 })!;
+    for (const d of dates) {
+      expect(setup.demands.some((r) => r.date === d && r.headcount >= 1)).toBe(true);
+    }
+  });
+
+  it("round-trips through feasibilityHints with zero warnings", () => {
+    for (const staffCount of [6, 10, 30]) {
+      for (const window of [dates.slice(0, 1), dates, [...dates, ...dates.map((d) => d.replace("2026-08-0", "2026-08-1"))]]) {
+        const setup = suggestSetup({ dates: window, profileShifts, staffCount })!;
+        expect(setup).not.toBeNull();
+        const hints = feasibilityHints({
+          dates: window,
+          targetWorkMin: setup.targetWorkMin,
+          profileShifts,
+          staffCount,
+          demands: setup.demands,
+          leaves: [],
+        });
+        expect(hints).toEqual([]);
+      }
+    }
+  });
+
+  it("returns null without staff or work shifts", () => {
+    expect(suggestSetup({ dates, profileShifts, staffCount: 0 })).toBeNull();
+    expect(suggestSetup({ dates, profileShifts: [al], staffCount: 10 })).toBeNull();
+    expect(suggestSetup({ dates: [], profileShifts, staffCount: 10 })).toBeNull();
   });
 });

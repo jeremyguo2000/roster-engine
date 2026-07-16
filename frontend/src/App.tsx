@@ -13,12 +13,14 @@ import { AuthProvider } from "./auth/AuthContext";
 import RequireAuth from "./auth/RequireAuth";
 import { ToastProvider } from "./components/Toast";
 import RosterJobWatcher from "./components/RosterJobWatcher";
+import WorkflowGuide from "./components/WorkflowGuide";
 
 export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
         <RosterJobWatcher />
+        <WorkflowGuide />
         <div className="app-shell">
           <Nav />
           <main className="main">

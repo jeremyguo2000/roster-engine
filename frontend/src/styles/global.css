@@ -535,38 +535,63 @@ input, select, textarea { font-family: inherit; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-4); }
 
 /* =========================================================
-   Workflow guide (setup checklist on the Rosters landing page)
+   Workflow guide (floating setup checklist, follows all pages)
    ========================================================= */
-.workflow-guide {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--s-4);
+.workflow-overlay {
+  position: fixed;
+  top: 68px; /* just below the 56px sticky nav */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80; /* under modals (100) and toasts (200) */
+  width: 340px;
+  max-width: calc(100vw - 2 * var(--s-5));
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 3px solid var(--primary);
   border-radius: var(--r-lg);
-  padding: var(--s-4) var(--s-5);
-  margin-bottom: var(--s-6);
+  padding: var(--s-4);
+  box-shadow: 0 8px 24px rgba(43, 42, 40, 0.12);
 }
 
-.workflow-guide-steps {
+.workflow-overlay-head {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: var(--s-3);
+}
+
+.workflow-overlay-close {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  padding: 0 var(--s-1);
+}
+.workflow-overlay-close:hover { color: var(--ink); }
+
+.workflow-overlay-steps {
+  display: flex;
+  flex-direction: column;
   gap: var(--s-1);
 }
 
-.workflow-step-wrap {
-  display: flex;
-  align-items: center;
+.workflow-overlay-pill {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: var(--s-2) var(--s-4);
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(43, 42, 40, 0.1);
 }
-
-.workflow-step-arr {
-  color: var(--muted);
-  margin: 0 var(--s-2);
-}
+.workflow-overlay-pill:hover { background: var(--hover); }
 
 .workflow-step {
   display: flex;

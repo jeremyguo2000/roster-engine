@@ -22,7 +22,6 @@ import RosterSummary from "../components/RosterSummary";
 import Calendar from "../components/Calendar";
 import DayTimetable from "../components/DayTimetable";
 import RangeTimetable from "../components/RangeTimetable";
-import WorkflowGuide from "../components/WorkflowGuide";
 
 export default function RostersPage() {
   const rostersQ = useQuery({
@@ -62,8 +61,6 @@ export default function RostersPage() {
         </div>
         <Link to="/generate" className="btn btn-primary">+ Generate Roster</Link>
       </div>
-
-      <WorkflowGuide />
 
       {rostersQ.isLoading && <div className="empty-state">Loading…</div>}
 

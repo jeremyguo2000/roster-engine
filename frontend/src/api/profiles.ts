@@ -8,6 +8,22 @@ export interface ConditionalConstraint {
   enforce_val: number;
 }
 
+export interface DemandTemplateRow {
+  start_min: number;
+  end_min: number;
+  headcount: number;
+  skill_value_id: number | null;
+}
+
+/**
+ * A reusable Generate-wizard setup: a daily demand pattern plus a per-day
+ * target, so applying to any window length scales the target correctly.
+ */
+export interface GenerateTemplate {
+  target_work_min_per_day: number;
+  rows: DemandTemplateRow[];
+}
+
 export interface ProfileConfig {
   weight_overstaff?: number;
   weight_consec?: number;
@@ -16,6 +32,7 @@ export interface ProfileConfig {
   weight_weekend?: number;
   time_limit?: number;
   conditional_constraints?: ConditionalConstraint[];
+  generate_template?: GenerateTemplate;
   [k: string]: unknown;
 }
 
