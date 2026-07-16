@@ -22,13 +22,37 @@ const STEPS = [
 
 type StepKey = (typeof STEPS)[number]["key"];
 
-// Concrete "what to press" per step, shown for the current step.
-const HINTS: Record<StepKey, string> = {
-  shifts: "Press “+ Group” for a shift group (e.g. Day / Night), then “+ Shift” for each start–end time with its paid minutes.",
-  staff: "Press “+ Group” for a team, then “+ Staff” for each person. Skills and permitted shifts are optional.",
-  profiles: "Press “+ Profile”, then use “Add group” under Staff and Shifts to pull in a whole team and shift catalogue at once.",
-  generate: "Click two dates to pick a window, press “Suggest demands & target” (or “Apply template”), name the roster, then Generate.",
-  approve: "Open the draft once the solver finishes and press “Approve”.",
+// Concrete numbered instructions per step, shown in the expanded panel.
+const DETAILS: Record<StepKey, string[]> = {
+  shifts: [
+    "Press “+ Group” for each kind of shift: e.g. DSG (day), ESG (evening), NSG (night — tick “night shift”), and a Leaves group with “counts as work” off.",
+    "Press “+ Shift” inside each group: short code, start/end time, and paid work minutes.",
+    "Keep paid minutes the same across shifts (e.g. 440) — staff must hit their hours target exactly, so mixed credits make targets hard to reach.",
+    "Add one leave shift (code “AL”) with the same paid minutes, so leave days still count toward hours.",
+  ],
+  staff: [
+    "Press “+ Group” to create the team (e.g. a ward).",
+    "Press “+ Staff” for each person — employee ID must be unique.",
+    "Optional: add skills (e.g. seniority) so demands can require them, and permitted shifts to restrict who works what (none listed = all allowed).",
+  ],
+  profiles: [
+    "Press “+ Profile” and name it after the team/ward.",
+    "Under Staff, press “Add group” to pull in the whole team at once.",
+    "Under Shifts, press “Add group” for each shift group — include the Leaves group.",
+    "Optional: tune solver weights, time limit, and rules like “no work the day after a night shift” in the config.",
+  ],
+  generate: [
+    "Click a start and end date on the calendar, then press “Use this range”.",
+    "Press “Suggest demands & target” for a feasible starting point, or “Apply template” if you saved one.",
+    "Adjust headcounts to your real needs — the feasibility check below warns before you waste a solve.",
+    "Name the roster and press Generate.",
+  ],
+  approve: [
+    "Wait for the solver — a “Solving…” pill shows in the nav (seconds to minutes).",
+    "Open the draft to review the grid, timetables, and per-staff summary.",
+    "Press “Approve” to lock it in, or “Discard” and regenerate with tweaks.",
+    "Happy with the setup? On Generate, press “Save as template” to reuse it next time.",
+  ],
 };
 
 const OPEN_KEY = "workflow-guide-open"; // "1" open, "0" hidden, unset = auto
@@ -37,6 +61,7 @@ export default function WorkflowGuide() {
   const { user } = useAuth();
   const location = useLocation();
   const [openPref, setOpenPref] = useState<string | null>(() => localStorage.getItem(OPEN_KEY));
+  const [expandedPref, setExpandedPref] = useState<StepKey | null>(null);
 
   const enabled = !!user;
   const shiftsQ = useQuery({ queryKey: ["shifts", "all"], queryFn: () => listShifts(), enabled });
@@ -76,7 +101,8 @@ export default function WorkflowGuide() {
 
   const currentIndex = STEPS.findIndex((s) => !done[s.key]);
   const current = currentIndex === -1 ? null : STEPS[currentIndex];
-  const onCurrentPage = current !== null && location.pathname === current.to;
+  // The current step starts expanded; clicking another step peeks at it.
+  const expanded = expandedPref ?? current?.key ?? null;
 
   return (
     <div className="workflow-overlay">
@@ -91,26 +117,44 @@ export default function WorkflowGuide() {
         {STEPS.map((step, i) => {
           const isDone = done[step.key];
           const isCurrent = i === currentIndex;
+          const isExpanded = expanded === step.key;
+          const onPage = location.pathname === step.to;
           return (
-            <Link key={step.key} to={step.to} className={`workflow-step${isCurrent ? " current" : ""}`}>
-              <span className={`workflow-step-dot${isDone ? " done" : ""}${isCurrent ? " current" : ""}`}>
-                {isDone ? "✓" : i + 1}
-              </span>
-              <span className="workflow-step-label">{step.label}</span>
-            </Link>
+            <div key={step.key}>
+              <button
+                className={`workflow-step workflow-step-toggle${isCurrent ? " current" : ""}`}
+                onClick={() => setExpandedPref(isExpanded ? null : step.key)}
+                aria-expanded={isExpanded}
+              >
+                <span className={`workflow-step-dot${isDone ? " done" : ""}${isCurrent ? " current" : ""}`}>
+                  {isDone ? "✓" : i + 1}
+                </span>
+                <span className="workflow-step-label">{step.label}</span>
+                <span className="workflow-step-chevron">{isExpanded ? "▾" : "▸"}</span>
+              </button>
+              {isExpanded && (
+                <div className="workflow-step-details">
+                  <ol>
+                    {DETAILS[step.key].map((line, j) => (
+                      <li key={j}>{line}</li>
+                    ))}
+                  </ol>
+                  {!onPage && (
+                    <Link to={step.to} className="btn btn-sm btn-primary">
+                      Open {step.label} →
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
 
-      <p className="muted" style={{ fontSize: "var(--fs-sm)", margin: "var(--s-2) 0 0" }}>
-        {current === null
-          ? "All steps done — generate a new roster from any profile whenever you like."
-          : onCurrentPage
-            ? HINTS[current.key]
-            : `Next: ${current.label}.`}
-      </p>
-
       <div className="row" style={{ justifyContent: "space-between", marginTop: "var(--s-3)" }}>
+        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+          {current === null ? "All steps done ✓" : `Next: ${current.label}`}
+        </span>
         <a
           className="workflow-guide-link"
           href="/documentation/operators-manual.html"
@@ -119,11 +163,6 @@ export default function WorkflowGuide() {
         >
           Full guide ↗
         </a>
-        {current !== null && !onCurrentPage && (
-          <Link to={current.to} className="btn btn-sm btn-primary">
-            Take me there →
-          </Link>
-        )}
       </div>
     </div>
   );

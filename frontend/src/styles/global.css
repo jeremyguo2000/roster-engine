@@ -576,6 +576,34 @@ input, select, textarea { font-family: inherit; }
   gap: var(--s-1);
 }
 
+.workflow-step-toggle {
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.workflow-step-toggle:hover { background: var(--hover); }
+
+.workflow-step-chevron {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.workflow-step-details {
+  padding: var(--s-2) var(--s-2) var(--s-3) 34px; /* aligns under the label, past the dot */
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+}
+.workflow-step-details ol {
+  margin: 0 0 var(--s-2);
+  padding-left: var(--s-4);
+  display: grid;
+  gap: var(--s-2);
+}
+
 .workflow-overlay-pill {
   position: fixed;
   top: 68px;
