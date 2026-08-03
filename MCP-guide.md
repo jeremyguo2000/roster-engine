@@ -24,21 +24,24 @@ wrapper over the backend API. It runs as its own container on **host port 8001**
 
 ## Authentication model (read this first)
 
-The MCP server **holds no credentials and never logs in**. It uses pure **JWT pass-through**: it reads the
-`Authorization: Bearer <token>` header off the incoming MCP request and forwards that same header on every
-upstream backend call (`backend/app/mcp_server/server.py`, `_extract_jwt`).
+The MCP server **holds its own credentials and logs itself in** — it does not use the caller's identity at all.
+On first tool call it authenticates to the backend as a fixed **service account** (`ROSTER_SERVICE_USERNAME` /
+`ROSTER_SERVICE_PASSWORD`, set in the `mcp` container's environment — `mcp_service` in this repo's `.env`),
+caches the resulting JWT, and re-logs-in automatically before it expires or after a `401`
+(`backend/app/mcp_server/token_manager.py`).
 
-That means **you (the operator) supply the token**, in two steps:
+Practically, this means:
 
-1. **Have a backend user account.** If you don't have one, create it (see Prerequisites).
-2. **Exchange those credentials for a JWT** at `POST /api/auth/login`. The resulting **token** — *not* your
-   password — is what you put into the chatbot's MCP configuration.
+- **You don't obtain or configure a token.** Any `Authorization` header an MCP client sends is ignored —
+  `backend/app/mcp_server/client.py` always attaches the service account's own token.
+- **Every connected client shares one identity.** The backend has no way to distinguish which human is behind
+  a given tool call — whoever can reach the server's URL gets the full privileges of `mcp_service`. Treat
+  network reachability (Step 3 below) as the real access control for now.
+- The service account (`mcp_service` / `svc-mcp`, depending on environment — see `CLAUDE.md` and `DEPLOY.md`)
+  must already exist in the backend; it's created once during setup, not per chatbot user.
 
-The chatbot only ever holds the bearer token. Tokens expire after **24 hours** by default
-(`access_token_expire_minutes` in `backend/app/config.py`). There is **no in-band refresh** — when the token
-expires you re-run the login and update the client config with the new token.
-
-Create a **dedicated user** for the chatbot rather than reusing a personal or test account.
+`backend/app/mcp_server/identity.py` documents a "multi-user seam" for a future per-caller identity model, but
+that isn't implemented yet — today it's always the one shared account.
 
 ## Prerequisites
 
@@ -50,43 +53,20 @@ Create a **dedicated user** for the chatbot rather than reusing a personal or te
   ```bash
   docker compose -f docker-compose.dev.yml ps mcp
   ```
-- A backend user for the chatbot. Create one if needed:
-  ```bash
-  docker compose -f docker-compose.dev.yml exec backend \
-    python -m app.scripts.create_user chatbot 'a-strong-password'
-  ```
 - Your MCP client installed: OpenClaw (`openclaw mcp …` available) and/or Claude Code (`claude` CLI).
 
-## Step 1 — Obtain a JWT
-
-Log in against the backend and capture the `access_token`:
-
-```bash
-export TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"chatbot","password":"a-strong-password"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-
-echo "${TOKEN:0:24}…"   # sanity check that it's non-empty
-```
-
-(If you have `jq` installed, `| jq -r .access_token` works in place of the `python3` one-liner.)
-
-Remember: this token is valid for ~24 hours. When it expires, repeat this step and update your client config.
-
-## Step 2 — Register the server with your MCP client
+## Step 1 — Register the server with your MCP client
 
 The connection facts are the same for both clients — URL `http://localhost:8001/mcp`, Streamable HTTP
-transport, and the `Authorization: Bearer <token>` header. Only the registration syntax differs.
+transport, no credentials needed on the client side. Only the registration syntax differs.
 
-### 2A — OpenClaw
+### 1A — OpenClaw
 
 **CLI:**
 ```bash
 openclaw mcp add roster-engine \
   --url http://localhost:8001/mcp \
-  --transport streamable-http \
-  --header "Authorization: Bearer $TOKEN"
+  --transport streamable-http
 ```
 
 **Or edit the config file** `~/.openclaw/openclaw.json`:
@@ -96,8 +76,7 @@ openclaw mcp add roster-engine \
     "servers": {
       "roster-engine": {
         "url": "http://localhost:8001/mcp",
-        "transport": "streamable-http",
-        "headers": { "Authorization": "Bearer <paste-token-here>" }
+        "transport": "streamable-http"
       }
     }
   }
@@ -106,12 +85,11 @@ openclaw mcp add roster-engine \
 
 Run `openclaw mcp --help` to see the exact status/list/remove subcommands for your version.
 
-### 2B — Claude Code
+### 1B — Claude Code
 
 **CLI:**
 ```bash
-claude mcp add --transport http roster-engine http://localhost:8001/mcp \
-  --header "Authorization: Bearer $TOKEN"
+claude mcp add --transport http roster-engine http://localhost:8001/mcp
 ```
 
 - The transport flag is **`http`** for Claude Code (vs `streamable-http` for OpenClaw) — it's the same
@@ -119,19 +97,15 @@ claude mcp add --transport http roster-engine http://localhost:8001/mcp \
 - **Scope** with `-s`:
   - `local` (default) — this project only, written to `~/.claude.json`.
   - `user` — available across all your projects.
-  - `project` — shared with the team via a checked-in `.mcp.json`. **Do not use `project` scope here:** it would
-    commit your bearer token to the repo. Prefer `local` or `user`.
-- **Paste a full JSON config** in one shot instead, if you prefer:
-  ```bash
-  claude mcp add-json roster-engine '{"type":"http","url":"http://localhost:8001/mcp","headers":{"Authorization":"Bearer <token>"}}'
-  ```
+  - `project` — shared with the team via a checked-in `.mcp.json`. Since no per-user secret is involved anymore,
+    `project` scope is safe to use here if you want the team to share the registration.
 - Undo with `claude mcp remove roster-engine`.
 
 > **Startup caveat:** Claude Code loads MCP servers at session start. Adding the server mid-session registers it
 > but does **not** expose its tools to the running assistant — you must **restart Claude Code** for the six
 > `roster-engine` tools to appear.
 
-## Step 3 — Network reachability
+## Step 2 — Network reachability
 
 `http://localhost:8001` only works if the MCP client runs on the **same host** as the Docker stack.
 
@@ -144,7 +118,7 @@ claude mcp add --transport http roster-engine http://localhost:8001/mcp \
   ```
   A `307` (or `405`) proves the port is published. `Connection refused` means a port-mapping or firewall issue.
 
-## Step 4 — Reload & verify the connection
+## Step 3 — Reload & verify the connection
 
 Both clients load MCP servers at startup, so **restart the client** after registering.
 
@@ -159,7 +133,7 @@ Both clients load MCP servers at startup, so **restart the client** after regist
 Either way, a healthy connection lists all six tools: `list_profiles`, `list_skill_types`, `list_rosters`,
 `list_leaves`, `create_roster`, `get_roster_status`.
 
-## Step 5 — Chat to generate a roster
+## Step 4 — Chat to generate a roster
 
 With the server connected, the chatbot can drive the whole flow from natural language. Example prompt:
 
@@ -197,14 +171,15 @@ When `status` is `draft`, the solved roster also shows up in the web UI under **
 
 | Symptom | Cause / fix |
 |---|---|
-| Tool error `Missing Authorization: Bearer …` | No bearer header reached the MCP request — check the client's `headers` config. |
-| Tool error `Backend returned 401` | Token expired or invalid — repeat Step 1 and update the client config with the fresh token. |
-| `Connection refused` | Wrong host or port not published — see Step 3. |
+| Tool error `MCP service account login failed (…)` | `ROSTER_SERVICE_USERNAME`/`ROSTER_SERVICE_PASSWORD` on the `mcp` container don't match a real backend user — check `.env` and that the account exists. |
+| Tool error `Backend returned 401` | The service account's cached token was rejected; the client retries once with a fresh login automatically — a persistent 401 means the account's password changed or was deleted. |
+| `Connection refused` | Wrong host or port not published — see Step 2. |
 | Claude Code tools missing after `claude mcp add` | Restart Claude Code; MCP servers load at startup. |
 
 Known limitations (see `TESTPLAN.md` §7 for detail):
 
 - **No transactional rollback** on `create_roster`: if one demand in the batch fails after earlier ones were
   created, the earlier demand rows remain in the database.
-- **No in-band JWT refresh:** when the token expires mid-session, re-login and update the client config.
+- **Single shared identity:** every connected client acts as the same `mcp_service` account (see "Authentication
+  model" above) — there's no per-caller audit trail today, so treat network reachability as the access control.
 - The MCP server is a single uvicorn process — treat it as single-user for now.
