@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import skills, shifts, staff, profiles, rosters, demands, auth
+from app.routers import skills, shifts, staff, profiles, rosters, demands, auth, chat
  
 app = FastAPI(
     title="Roster Engine API",
@@ -25,6 +25,7 @@ app.include_router(staff.router,    prefix="/api")
 app.include_router(profiles.router, prefix="/api")
 app.include_router(rosters.router,  prefix="/api")
 app.include_router(demands.router,  prefix="/api")
+app.include_router(chat.router,     prefix="/api")
  
  
 @app.get("/api/health")

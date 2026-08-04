@@ -41,6 +41,11 @@ services:
       - CELERY_RESULT_BACKEND=db+postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - SECRET_KEY=${SECRET_KEY}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      # Read from ROSTER_ANTHROPIC_API_KEY, not ANTHROPIC_API_KEY: Compose resolves
+      # ${VAR} from the shell before .env, so a developer machine that exports
+      # ANTHROPIC_API_KEY for other tooling would silently shadow this file. The
+      # namespaced name can't collide; the container still sees ANTHROPIC_API_KEY.
+      - ANTHROPIC_API_KEY=${ROSTER_ANTHROPIC_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy

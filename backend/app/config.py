@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     secret_key: str
     access_token_expire_minutes: int = 1440
 
+    # Chat assistant. Optional: unset simply disables /api/chat (503) rather than
+    # stopping the whole backend from booting — rostering doesn't depend on it.
+    anthropic_api_key: str | None = None
+
     class Config:
         env_file = ".env"
 
