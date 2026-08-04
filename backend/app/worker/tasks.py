@@ -1,4 +1,5 @@
 import logging
+from dataclasses import asdict
 from datetime import timedelta
 
 from app.database import SessionLocal
@@ -16,6 +17,7 @@ from solver.models import (
     Demand     as SolverDemand,
 )
 from solver.solver import RosterEngine, ConditionalConstraint
+from solver.validate import validate_roster
 
 logger = logging.getLogger(__name__)
 
@@ -316,7 +318,25 @@ def run_solver(self, roster_id: int, time_limit: int = 600, previous_roster_id: 
             roster.result = {"error": "No feasible solution found within time limit."}
         else:
             roster.status = RosterStatus.draft
-            roster.result = _result_to_json(result)
+            result_json = _result_to_json(result)
+            try:
+                violations = validate_roster(
+                    result,
+                    target_work_min=roster.target_work_min,
+                    pre_assignments=pre_assignments,
+                    conditional_constraints=ccs,
+                    context=context,
+                )
+                result_json["violations"] = [asdict(v) for v in violations]
+                if violations:
+                    logger.warning(
+                        f"Roster {roster_id}: validator found {len(violations)} rule "
+                        f"violation(s): {[v.message for v in violations]}"
+                    )
+            except Exception:
+                # The audit must never take down a successful solve.
+                logger.exception(f"Roster {roster_id}: post-solve validation crashed")
+            roster.result = result_json
 
         db.commit()
 
