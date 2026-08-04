@@ -37,7 +37,12 @@ class RosterCreate(BaseModel):
     roster_start: date
     num_days: int
     target_work_min: int
-    demand_ids: list[int]
+    # Link demand rows that already exist...
+    demand_ids: list[int] = []
+    # ...and/or create new ones inside the same transaction as the roster. Prefer
+    # this: creating demands via POST /demands first leaves orphaned rows behind if
+    # a later step fails, since each request commits on its own.
+    demands: list[DemandCreate] = []
     previous_roster_id: int | None = None
  
 class RosterOut(RosterListItem):
