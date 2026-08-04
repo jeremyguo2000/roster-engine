@@ -14,6 +14,7 @@ import RequireAuth from "./auth/RequireAuth";
 import { ToastProvider } from "./components/Toast";
 import RosterJobWatcher from "./components/RosterJobWatcher";
 import WorkflowGuide from "./components/WorkflowGuide";
+import ChatAssistant from "./components/ChatAssistant";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
       <ToastProvider>
         <RosterJobWatcher />
         <WorkflowGuide />
+        <ChatAssistant />
         <div className="app-shell">
           <Nav />
           <main className="main">

@@ -660,3 +660,159 @@ a.workflow-step:hover { background: var(--hover); text-decoration: none; }
   font-size: var(--fs-sm);
   white-space: nowrap;
 }
+
+/* =========================================================
+   Scheduling assistant (floating chat, bottom-right)
+   ========================================================= */
+.chat-pill {
+  position: fixed;
+  right: var(--s-5);
+  bottom: var(--s-5);
+  z-index: 80; /* under modals (100) and toasts (200) */
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: var(--s-2) var(--s-4);
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(43, 42, 40, 0.1);
+}
+.chat-pill:hover { background: var(--hover); }
+
+.chat-panel {
+  position: fixed;
+  right: var(--s-5);
+  bottom: var(--s-5);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  max-width: calc(100vw - 2 * var(--s-5));
+  /* Tall enough to hold a conversation, but never taller than the viewport. */
+  height: min(560px, calc(100vh - 100px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--r-lg);
+  box-shadow: 0 8px 24px rgba(43, 42, 40, 0.12);
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-reset {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  padding: 0;
+}
+.chat-reset:hover { color: var(--ink); text-decoration: underline; }
+
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  font-size: var(--fs-sm);
+}
+
+.chat-suggestion {
+  text-align: left;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.chat-suggestion:hover { background: var(--hover); color: var(--ink); }
+
+.chat-msg {
+  /* Replies arrive as plain text with real newlines — pre-wrap keeps the
+     paragraphs and lists the model wrote instead of collapsing them. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
+  max-width: 90%;
+}
+
+.chat-msg-user {
+  align-self: flex-end;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+.chat-msg-assistant {
+  align-self: flex-start;
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.chat-thinking { color: var(--muted); font-style: italic; }
+
+.chat-error {
+  margin: 0 var(--s-4) var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--fs-sm);
+}
+
+.chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--border);
+}
+
+.chat-textarea {
+  flex: 1;
+  resize: none;
+  /* Grows with the question up to a few lines, then scrolls. */
+  min-height: 34px;
+  max-height: 120px;
+  padding: var(--s-2) var(--s-3);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+}
+.chat-textarea:focus { outline: none; box-shadow: var(--focus-ring); }
+
+@media (max-width: 520px) {
+  .chat-panel {
+    right: var(--s-3);
+    left: var(--s-3);
+    bottom: var(--s-3);
+    width: auto;
+    height: min(70vh, calc(100vh - 80px));
+  }
+  .chat-pill { right: var(--s-3); bottom: var(--s-3); }
+}

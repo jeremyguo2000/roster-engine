@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session, joinedload
 from datetime import timedelta
 
 from app.database import get_db
-from app.models import Roster, RosterStatus, RosterDemand, Demand, Profile, Leave, User
+from app.models import (
+    Roster, RosterStatus, RosterDemand, Demand, Profile, Leave, SkillValue, User
+)
 from app.dependencies.auth import get_current_user
 from app.schemas.roster import RosterListItem, RosterCreate, RosterOut, DemandOut
 from app.worker.tasks import run_solver
@@ -30,7 +32,12 @@ def list_rosters(
 def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a roster, link existing demand rows, then dispatch the solver."""
+    """Create a roster, link its demand rows, then dispatch the solver.
+
+    Demands may be referenced by id (`demand_ids`, already created) or supplied
+    inline (`demands`, created here). Inline demands are created in the same
+    transaction as the roster, so a failure anywhere leaves nothing behind.
+    """
     if not db.get(Profile, body.profile_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found.")
 
@@ -40,6 +47,14 @@ def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db),
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND,
                 f"Demand id {demand_id} not found."
+            )
+
+    # Validate inline demands' skill references before writing anything
+    for d in body.demands:
+        if d.skill_value_id and not db.get(SkillValue, d.skill_value_id):
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                f"Skill value id {d.skill_value_id} not found."
             )
 
     # Validate previous_roster_id if provided
@@ -65,9 +80,16 @@ def create_and_run_roster(body: RosterCreate, db: Session = Depends(get_db),
         target_work_min=body.target_work_min,
     )
     db.add(roster)
+
+    # Inline demands are created here rather than via POST /demands so they share
+    # this transaction — nothing persists unless the whole roster succeeds.
+    new_demands = [Demand(**d.model_dump()) for d in body.demands]
+    db.add_all(new_demands)
+
+    # One flush assigns the primary key on every pending row (roster + demands).
     db.flush()
 
-    for demand_id in body.demand_ids:
+    for demand_id in [*body.demand_ids, *(d.id for d in new_demands)]:
         db.add(RosterDemand(roster_id=roster.id, demand_id=demand_id))
 
     db.commit()
