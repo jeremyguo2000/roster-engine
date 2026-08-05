@@ -6,7 +6,7 @@ requires — and installing it on a Kubernetes cluster.
 
 What you hand to the PCAI operators is two things:
 
-1. **The chart**: `charts/roster-engine-0.1.0.tgz` (produced by `helm package`)
+1. **The chart**: `charts/roster-engine-0.2.0.tgz` (produced by `helm package`)
 2. **Two container images** (`roster-backend`, `roster-frontend`), pushed to a
    registry their cluster can pull from
 
@@ -19,8 +19,8 @@ Everything else (Postgres, Redis) is pulled automatically from Docker Hub.
 From the repo root:
 
 ```bash
-docker build -f backend/Dockerfile -t roster-backend:0.1.0 .     # note: repo root context
-docker build -t roster-frontend:0.1.0 ./frontend
+docker build -f backend/Dockerfile -t roster-backend:0.2.0 .     # note: repo root context
+docker build -t roster-frontend:0.2.0 ./frontend
 ```
 
 The backend image is shared by three containers (API, celery worker, MCP
@@ -34,10 +34,10 @@ or give you credentials for an internal registry). Then:
 ```bash
 REG=harbor.example.com/roster        # whatever they give you
 
-docker tag roster-backend:0.1.0  $REG/roster-backend:0.1.0
-docker tag roster-frontend:0.1.0 $REG/roster-frontend:0.1.0
-docker push $REG/roster-backend:0.1.0
-docker push $REG/roster-frontend:0.1.0
+docker tag roster-backend:0.2.0  $REG/roster-backend:0.2.0
+docker tag roster-frontend:0.2.0 $REG/roster-frontend:0.2.0
+docker push $REG/roster-backend:0.2.0
+docker push $REG/roster-frontend:0.2.0
 ```
 
 ## 3. Package the chart
@@ -47,18 +47,18 @@ docker push $REG/roster-frontend:0.1.0
 docker run --rm -v "$PWD/charts:/charts" -w /charts alpine/helm:3.16.2 package roster-engine
 ```
 
-This produces `charts/roster-engine-0.1.0.tgz` — the "Helm deployment package".
+This produces `charts/roster-engine-0.2.0.tgz` — the "Helm deployment package".
 
 ## 4. Install
 
 Three values are **required** (the install aborts with a clear message if any
-is missing). Put them in a values file:
+is missing), plus one optional feature below. Put them in a values file:
 
 ```yaml
 # my-values.yaml
 image:
   registry: harbor.example.com/roster   # where you pushed in step 2
-  tag: "0.1.0"
+  tag: "0.2.0"
 
 auth:
   secretKey: "<openssl rand -hex 32>"   # JWT signing key — generate once, keep stable across upgrades
@@ -70,8 +70,29 @@ mcp:
   servicePassword: "<pick a password for the MCP service account>"
 ```
 
+**Optional — the in-app chat assistant.** Off by default. Turning it on needs an
+Anthropic API key *and* egress from the backend pod to `https://api.anthropic.com`:
+
+```yaml
+chat:
+  enabled: true
+  anthropicApiKey: "<key from console.anthropic.com/settings/keys>"
+```
+
+Left disabled, `/api/chat` returns 503 and the web UI hides the widget — nothing
+else is affected, and the rest of the app needs no outbound internet access.
+
+> ⚠️ **Check egress before enabling.** This is the only feature that talks to the
+> internet. On a cluster with restricted egress, allow `api.anthropic.com` from the
+> backend pod or leave `chat.enabled: false`.
+>
+> ⚠️ **Data leaves the cluster when it's on.** Answering questions about a solved
+> roster sends that roster's contents — including staff names — to the Anthropic
+> API. Confirm that's acceptable for the deployment's data-governance rules before
+> enabling it in an environment holding real staff data.
+
 ```bash
-helm install roster charts/roster-engine-0.1.0.tgz -n roster --create-namespace -f my-values.yaml
+helm install roster charts/roster-engine-0.2.0.tgz -n roster --create-namespace -f my-values.yaml
 kubectl -n roster get pods -w     # wait until everything is Running/Ready
 ```
 
@@ -169,7 +190,7 @@ Docker on this machine — the whole flow below was verified working on
 ```bash
 # 1. cluster + images (no registry needed locally — images are copied in)
 kind create cluster --name roster
-kind load docker-image roster-backend:0.1.0 roster-frontend:0.1.0 --name roster
+kind load docker-image roster-backend:0.2.0 roster-frontend:0.2.0 --name roster
 
 # 2. install (steps 4–5 of this doc, condensed)
 helm install roster charts/roster-engine -n roster --create-namespace \
@@ -212,3 +233,5 @@ create a roster in the UI. Two things to know when test-driving a solve:
 | Login fails with 401 for MCP tools | `svc-mcp` user not created, or password ≠ `mcp.servicePassword` |
 | Solves stuck in `running` | Worker pod down or can't reach Redis — check `kubectl logs deploy/...-worker` |
 | UI loads but API calls fail | Backend not Ready — check `/api/health` via `kubectl port-forward svc/...-backend 8000:8000` |
+| Chat widget never appears | `chat.enabled` is false, or no key — the UI hides it when `GET /api/chat/status` reports `enabled: false` |
+| Chat replies "assistant failed to respond" | Usually blocked egress to `api.anthropic.com`, or an invalid/revoked key — `kubectl logs deploy/...-backend` shows the underlying error |

@@ -53,6 +53,15 @@ spec:
             - containerPort: 8000
           env:
             {{- include "roster-engine.appEnv" . | nindent 12 }}
+            {{- if .Values.chat.enabled }}
+            # Only the backend serves /api/chat, so the key stays out of the
+            # shared appEnv helper the worker also uses.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: ANTHROPIC_API_KEY
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /api/health
