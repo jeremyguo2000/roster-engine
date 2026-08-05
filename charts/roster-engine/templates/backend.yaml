@@ -54,13 +54,35 @@ spec:
           env:
             {{- include "roster-engine.appEnv" . | nindent 12 }}
             {{- if .Values.chat.enabled }}
-            # Only the backend serves /api/chat, so the key stays out of the
-            # shared appEnv helper the worker also uses.
+            # Only the backend serves /api/chat, so these stay out of the shared
+            # appEnv helper that the worker also uses.
+            - name: CHAT_PROVIDER
+              value: {{ .Values.chat.provider | quote }}
+            {{- if eq .Values.chat.provider "anthropic" }}
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ include "roster-engine.fullname" . }}
                   key: ANTHROPIC_API_KEY
+            {{- else if eq .Values.chat.provider "openai" }}
+            - name: CHAT_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: CHAT_BASE_URL
+            - name: CHAT_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: CHAT_MODEL
+            {{- if .Values.chat.apiKey }}
+            - name: CHAT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: CHAT_API_KEY
+            {{- end }}
+            {{- end }}
             {{- end }}
           readinessProbe:
             httpGet:

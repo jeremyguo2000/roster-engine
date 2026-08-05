@@ -52,15 +52,32 @@ mcp:
   resources: {}
 
 # In-app scheduling assistant (the chat widget). Optional: when disabled, or when
-# no key is supplied, /api/chat returns 503 and the UI hides the widget entirely —
+# left unconfigured, /api/chat returns 503 and the UI hides the widget entirely —
 # the rest of the app is unaffected.
-#
-# Requires egress from the backend pod to https://api.anthropic.com. On clusters
-# with restricted egress, allow that host or leave this disabled.
 chat:
   enabled: false
-  # API key from https://console.anthropic.com/settings/keys
-  anthropicApiKey: ""
+
+  # "anthropic" — the Claude API. Best answer quality, but the backend pod needs
+  #   egress to https://api.anthropic.com, and roster contents (including staff
+  #   names) leave the cluster.
+  # "openai"    — any endpoint speaking OpenAI's /v1/chat/completions with tool
+  #   calling. This is the on-prem option: nothing leaves the cluster. HPE PCAI
+  #   serves models this way (vllm/vllm-openai with --enable-auto-tool-choice), as
+  #   do NVIDIA NIM and Ollama. Despite the name, no request goes to OpenAI.
+  provider: anthropic
+
+  # provider: anthropic
+  anthropicApiKey: ""  # from https://console.anthropic.com/settings/keys
+
+  # provider: openai — baseUrl and model are both required.
+  # baseUrl is the in-cluster endpoint including /v1, e.g.
+  #   http://my-llm-predictor.my-namespace.svc.cluster.local:8080/v1
+  baseUrl: ""
+  # The model name the endpoint serves, e.g. "llama-3.3-70b-instruct". Pick one
+  # validated for tool calling — the assistant is useless without it.
+  model: ""
+  # Often unset: in-cluster endpoints are frequently unauthenticated.
+  apiKey: ""
 
 frontend:
   service:

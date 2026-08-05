@@ -1,18 +1,26 @@
-"""Chat service — runs the Claude tool-calling loop for the in-app assistant."""
+"""Chat service — runs the tool-calling loop for the in-app assistant.
+
+Provider-independent: see providers.py for the Anthropic and OpenAI-compatible
+implementations, and build_provider() for how one is chosen from settings.
+"""
 
 import json
 import logging
 
-from anthropic import AsyncAnthropic
-
 from app.config import settings
 from app.tooling.client import RosterApiClient, static_token
 
-from .tools import TOOLS, execute_tool
+from .providers import (
+    AnthropicProvider,
+    OpenAICompatibleProvider,
+    Provider,
+    ToolCall,
+)
+from .tools import ANTHROPIC_TOOLS, OPENAI_TOOLS, execute_tool
 
 logger = logging.getLogger(__name__)
 
-MODEL = "claude-sonnet-5"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5"
 MAX_TOKENS = 4096
 
 # Guards against a runaway loop (e.g. the model retrying a failing tool forever).
@@ -96,8 +104,54 @@ class ChatUnavailable(RuntimeError):
     """Raised when the assistant isn't configured (no API key)."""
 
 
-def _text_from(blocks) -> str:
-    return "\n".join(b.text for b in blocks if b.type == "text").strip()
+def is_configured() -> bool:
+    """Whether the assistant can run with the current settings."""
+    if settings.chat_provider == "anthropic":
+        return bool(settings.anthropic_api_key)
+    if settings.chat_provider == "openai":
+        return bool(settings.chat_base_url)
+    return False
+
+
+def build_provider() -> Provider:
+    """Construct the configured provider, or explain what's missing."""
+    provider = settings.chat_provider
+
+    if provider == "anthropic":
+        if not settings.anthropic_api_key:
+            raise ChatUnavailable(
+                "The chat assistant is not configured: chat_provider is 'anthropic' "
+                "but ANTHROPIC_API_KEY is unset."
+            )
+        return AnthropicProvider(
+            api_key=settings.anthropic_api_key,
+            model=settings.chat_model or DEFAULT_ANTHROPIC_MODEL,
+            max_tokens=MAX_TOKENS,
+            tools=ANTHROPIC_TOOLS,
+        )
+
+    if provider == "openai":
+        if not settings.chat_base_url:
+            raise ChatUnavailable(
+                "The chat assistant is not configured: chat_provider is 'openai' "
+                "but CHAT_BASE_URL is unset (e.g. http://my-llm.svc:8080/v1)."
+            )
+        if not settings.chat_model:
+            raise ChatUnavailable(
+                "The chat assistant is not configured: chat_provider is 'openai' "
+                "requires CHAT_MODEL (the model name the endpoint serves)."
+            )
+        return OpenAICompatibleProvider(
+            base_url=settings.chat_base_url,
+            model=settings.chat_model,
+            max_tokens=MAX_TOKENS,
+            tools=OPENAI_TOOLS,
+            api_key=settings.chat_api_key,
+        )
+
+    raise ChatUnavailable(
+        f"Unknown chat_provider {provider!r} — expected 'anthropic' or 'openai'."
+    )
 
 
 async def chat(messages: list[dict], token: str) -> str:
@@ -105,50 +159,36 @@ async def chat(messages: list[dict], token: str) -> str:
 
     `messages` is the full conversation so far; the caller owns history. `token` is
     the requesting user's own JWT, so tool calls act as that user.
-    """
-    if not settings.anthropic_api_key:
-        raise ChatUnavailable(
-            "The chat assistant is not configured on this server "
-            "(ANTHROPIC_API_KEY is unset)."
-        )
 
-    anthropic = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    The loop is provider-independent: the provider translates one turn to and from
+    its wire format, and everything else — tool dispatch, error handling, the
+    iteration cap — is shared.
+    """
+    provider = build_provider()
     client = RosterApiClient(BACKEND_URL, token_provider=static_token(token))
 
     convo: list[dict] = list(messages)
     try:
         for _ in range(MAX_ITERATIONS):
-            response = await anthropic.messages.create(
-                model=MODEL,
-                max_tokens=MAX_TOKENS,
-                system=SYSTEM_PROMPT,
-                tools=TOOLS,
-                messages=convo,
-            )
+            turn = await provider.send(convo, SYSTEM_PROMPT)
 
-            if response.stop_reason != "tool_use":
-                return _text_from(response.content) or "(no response)"
+            if not turn.tool_calls:
+                return turn.text or "(no response)"
 
-            convo.append({"role": "assistant", "content": response.content})
+            convo.append(turn.assistant_message)
 
-            results = []
-            for block in response.content:
-                if block.type != "tool_use":
-                    continue
-                logger.info("chat tool call: %s", block.name)
-                result = await execute_tool(block.name, block.input, client)
-                is_error = isinstance(result, str) and result.startswith("Error:")
-                results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result
-                        if isinstance(result, str)
-                        else json.dumps(result, default=str),
-                        "is_error": is_error,
-                    }
+            results: list[tuple[ToolCall, str]] = []
+            for call in turn.tool_calls:
+                logger.info("chat tool call (%s): %s", provider.name, call.name)
+                result = await execute_tool(call.name, call.arguments, client)
+                output = (
+                    result
+                    if isinstance(result, str)
+                    else json.dumps(result, default=str)
                 )
-            convo.append({"role": "user", "content": results})
+                results.append((call, output))
+
+            convo.extend(provider.tool_result_messages(results))
 
         return (
             "I wasn't able to finish that — it took more steps than I'm allowed in one "
@@ -156,3 +196,4 @@ async def chat(messages: list[dict], token: str) -> str:
         )
     finally:
         await client.aclose()
+        await provider.aclose()

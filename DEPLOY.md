@@ -70,26 +70,51 @@ mcp:
   servicePassword: "<pick a password for the MCP service account>"
 ```
 
-**Optional — the in-app chat assistant.** Off by default. Turning it on needs an
-Anthropic API key *and* egress from the backend pod to `https://api.anthropic.com`:
+**Optional — the in-app chat assistant.** Off by default, and it runs against
+either of two model providers. Left disabled, `/api/chat` returns 503 and the web
+UI hides the widget; nothing else is affected and the app needs no outbound
+internet access at all.
+
+**Option A — on-prem model (no data leaves the cluster).** Point it at any
+endpoint serving OpenAI's `/v1/chat/completions` with tool calling. On PCAI that's
+a model deployed through MLIS/NIM or `vllm/vllm-openai`; the endpoint URL is the
+one under *GenAI → Model Endpoints* with `/v1` appended.
 
 ```yaml
 chat:
   enabled: true
+  provider: openai
+  baseUrl: "http://<model-endpoint>.<namespace>.svc.cluster.local:8080/v1"
+  model: "llama-3.3-70b-instruct"   # must be one validated for tool calling
+  apiKey: ""                         # only if the endpoint requires a token
+```
+
+Despite the name, `provider: openai` sends nothing to OpenAI — "OpenAI-compatible"
+is a wire format that most self-hosted servers implement. Requests go only to
+`baseUrl`.
+
+> ⚠️ **Tool calling is required, and it's the weak point.** The assistant is
+> driven entirely by tool calls. vLLM needs `--enable-auto-tool-choice` and a
+> `--tool-call-parser` matching the model. Smaller models are unreliable at
+> `create_roster`, which takes a nested array of demand rows; a 70B-class instruct
+> model is a sensible floor. Read-only questions are far less demanding.
+
+**Option B — Claude API (best quality, needs egress).**
+
+```yaml
+chat:
+  enabled: true
+  provider: anthropic
   anthropicApiKey: "<key from console.anthropic.com/settings/keys>"
 ```
 
-Left disabled, `/api/chat` returns 503 and the web UI hides the widget — nothing
-else is affected, and the rest of the app needs no outbound internet access.
-
-> ⚠️ **Check egress before enabling.** This is the only feature that talks to the
-> internet. On a cluster with restricted egress, allow `api.anthropic.com` from the
-> backend pod or leave `chat.enabled: false`.
+> ⚠️ **Requires egress to `api.anthropic.com`** from the backend pod. This is the
+> only part of the app that talks to the internet.
 >
-> ⚠️ **Data leaves the cluster when it's on.** Answering questions about a solved
-> roster sends that roster's contents — including staff names — to the Anthropic
-> API. Confirm that's acceptable for the deployment's data-governance rules before
-> enabling it in an environment holding real staff data.
+> ⚠️ **Data leaves the cluster.** Answering questions about a solved roster sends
+> that roster's contents — including staff names — to the Anthropic API. Confirm
+> that's acceptable under the deployment's data-governance rules before enabling
+> it anywhere holding real staff data. If it isn't, use Option A.
 
 ```bash
 helm install roster charts/roster-engine-0.2.0.tgz -n roster --create-namespace -f my-values.yaml
@@ -234,4 +259,6 @@ create a roster in the UI. Two things to know when test-driving a solve:
 | Solves stuck in `running` | Worker pod down or can't reach Redis — check `kubectl logs deploy/...-worker` |
 | UI loads but API calls fail | Backend not Ready — check `/api/health` via `kubectl port-forward svc/...-backend 8000:8000` |
 | Chat widget never appears | `chat.enabled` is false, or no key — the UI hides it when `GET /api/chat/status` reports `enabled: false` |
-| Chat replies "assistant failed to respond" | Usually blocked egress to `api.anthropic.com`, or an invalid/revoked key — `kubectl logs deploy/...-backend` shows the underlying error |
+| Chat replies "assistant failed to respond" | `kubectl logs deploy/...-backend` shows the cause. `provider: anthropic` — blocked egress to `api.anthropic.com`, or a bad key. `provider: openai` — wrong `baseUrl`, or the endpoint returned non-200 (the log quotes its body) |
+| Chat answers but never uses live data | The model isn't emitting tool calls. Check the endpoint runs with tool calling enabled (`--enable-auto-tool-choice` + a matching `--tool-call-parser` on vLLM) and that the model supports it |
+| Which provider is live? | `GET /api/chat/status` returns `{"enabled": ..., "provider": ...}` |

@@ -21,7 +21,7 @@ import pytest
 os.environ.setdefault("ROSTER_SERVICE_USERNAME", "test")
 os.environ.setdefault("ROSTER_SERVICE_PASSWORD", "test")
 
-from app.chat.tools import TOOLS as CHAT_TOOLS  # noqa: E402
+from app.chat.tools import ANTHROPIC_TOOLS, OPENAI_TOOLS  # noqa: E402
 from app.mcp_server.server import mcp  # noqa: E402
 from app.tooling.params import DESCRIPTIONS, PARAMS  # noqa: E402
 
@@ -43,13 +43,33 @@ def mcp_tools() -> dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def chat_tools() -> dict[str, Any]:
-    return {t["name"]: t for t in CHAT_TOOLS}
+    """Chat tools normalised to {name: {description, schema}} regardless of the
+    provider wire shape, so the assertions below apply to both."""
+    out: dict[str, Any] = {}
+    for t in ANTHROPIC_TOOLS:
+        out[t["name"]] = {"description": t["description"], "schema": t["input_schema"]}
+    for t in OPENAI_TOOLS:
+        fn = t["function"]
+        # Both shapes must agree with each other as well as with MCP.
+        assert out[fn["name"]]["description"] == fn["description"]
+        assert out[fn["name"]]["schema"] == fn["parameters"]
+    return out
 
 
 def test_both_surfaces_expose_the_registry(mcp_tools, chat_tools):
     expected = set(PARAMS)
     assert set(mcp_tools) == expected, "MCP tools drifted from app.tooling.params"
     assert set(chat_tools) == expected, "chat tools drifted from app.tooling.params"
+    assert {t["function"]["name"] for t in OPENAI_TOOLS} == expected
+
+
+def test_openai_tools_use_the_function_wrapper():
+    """The OpenAI shape must nest the schema under function.parameters — an
+    endpoint like vLLM rejects Anthropic's flat input_schema form."""
+    for t in OPENAI_TOOLS:
+        assert t["type"] == "function"
+        assert set(t["function"]) == {"name", "description", "parameters"}
+        assert "input_schema" not in t["function"]
 
 
 @pytest.mark.parametrize("name", sorted(PARAMS))
@@ -62,7 +82,7 @@ def test_descriptions_match(name, mcp_tools, chat_tools):
 def test_parameter_schemas_match(name, mcp_tools, chat_tools):
     """The payload a model would construct must be identical on both surfaces."""
     mcp_schema = _strip_titles(mcp_tools[name].inputSchema)
-    chat_schema = _strip_titles(chat_tools[name]["input_schema"])
+    chat_schema = _strip_titles(chat_tools[name]["schema"])
 
     assert mcp_schema.get("properties", {}) == chat_schema.get("properties", {}), (
         f"{name}: parameter properties differ between MCP and chat"

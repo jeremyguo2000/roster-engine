@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.chat.service import ChatUnavailable, chat as run_chat
+from app.chat.service import ChatUnavailable, chat as run_chat, is_configured
 from app.config import settings
 from app.dependencies.auth import get_current_user, oauth2_scheme
 from app.models import User
@@ -57,5 +57,6 @@ async def send_message(
 @router.get("/status")
 def chat_status(current_user: User = Depends(get_current_user)):
     """Whether the assistant is configured — lets the UI hide the widget instead of
-    showing one that 503s on first use."""
-    return {"enabled": bool(settings.anthropic_api_key)}
+    showing one that 503s on first use. `provider` is reported for support: which
+    model answered is the first question when replies look wrong."""
+    return {"enabled": is_configured(), "provider": settings.chat_provider}

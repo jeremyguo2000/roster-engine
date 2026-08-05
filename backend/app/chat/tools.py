@@ -1,7 +1,13 @@
-"""Anthropic tool-calling adapter over the shared tooling layer.
+"""Tool-calling adapter over the shared tooling layer.
 
-Tool schemas are derived from the Pydantic models in `app.tooling.params` rather
-than hand-written, so this surface and the MCP server can't drift apart.
+Schemas are derived from the Pydantic models in `app.tooling.params` rather than
+hand-written, so this surface and the MCP server can't drift apart.
+
+Two wire shapes are emitted from those same models, because the providers differ:
+Anthropic takes `{name, description, input_schema}`, OpenAI-compatible servers
+(vLLM, NIM, Ollama — what an on-prem deployment serves) take the same JSON Schema
+nested under `{type: "function", function: {...parameters}}`. Only the wrapper
+differs; the schema body is identical, so there is still one definition.
 """
 
 from typing import Any
@@ -35,12 +41,24 @@ def _input_schema(model) -> dict:
 
 
 # Built by iterating the shared registry — adding a tool to app.tooling.params
-# exposes it here automatically.
-TOOLS: list[dict] = [
+# exposes it on both providers automatically.
+ANTHROPIC_TOOLS: list[dict] = [
     {
         "name": name,
         "description": DESCRIPTIONS[name],
         "input_schema": _input_schema(model),
+    }
+    for name, model in PARAMS.items()
+]
+
+OPENAI_TOOLS: list[dict] = [
+    {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": DESCRIPTIONS[name],
+            "parameters": _input_schema(model),
+        },
     }
     for name, model in PARAMS.items()
 ]
