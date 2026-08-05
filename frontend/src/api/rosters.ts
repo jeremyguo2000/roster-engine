@@ -22,12 +22,30 @@ export interface RosterStaffRef {
   employee_id: string;
 }
 
+/**
+ * One rule breach found by the post-solve audit (backend/solver/validate.py).
+ * `rule` is the constraint number the solver is meant to enforce ("C1".."C9")
+ * or "consec"; `message` is already written for operators.
+ */
+export interface RosterViolation {
+  rule: string;
+  message: string;
+  employee_id?: string | null;
+  day?: number | null;
+}
+
 export interface RosterResult {
   roster_start: string;
   num_days: number;
   status?: string;
   staff: RosterStaffRef[];
   shifts: Record<string, RosterShiftInfo>;
+  /**
+   * Post-solve audit. Absent on rosters solved before the validator existed, so
+   * an empty array ("checked, all clear") and undefined ("never checked") are
+   * different states and are shown differently.
+   */
+  violations?: RosterViolation[];
   /** Keyed by employee_id, then by day-index string ("0".."num_days-1"), value is the shift code. Sparse — unassigned days are absent. */
   assignments: Record<string, Record<string, string>>;
   staff_max_consec?: Record<string, number>;

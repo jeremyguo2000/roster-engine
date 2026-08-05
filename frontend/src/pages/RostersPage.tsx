@@ -19,6 +19,7 @@ import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
 import RosterGrid from "../components/RosterGrid";
 import RosterSummary from "../components/RosterSummary";
+import RosterViolations from "../components/RosterViolations";
 import Calendar from "../components/Calendar";
 import DayTimetable from "../components/DayTimetable";
 import RangeTimetable from "../components/RangeTimetable";
@@ -230,6 +231,9 @@ function RosterDetailView({ roster }: { roster: Roster }) {
 
   return (
     <>
+      {/* Above the grid: if the solver broke its own rules, that's the first
+          thing an operator needs to know, before they read the schedule. */}
+      <RosterViolations violations={detail.result.violations} />
       <RosterGrid result={detail.result} />
       <RosterSummary result={detail.result} />
     </>

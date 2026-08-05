@@ -816,3 +816,82 @@ a.workflow-step:hover { background: var(--hover); text-decoration: none; }
   }
   .chat-pill { right: var(--s-3); bottom: var(--s-3); }
 }
+
+/* =========================================================
+   Post-solve rule audit (backend/solver/validate.py)
+   ========================================================= */
+.violations-clean {
+  margin-bottom: var(--s-4);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--status-approved-bg);
+  color: var(--status-approved-ink);
+  font-size: var(--fs-sm);
+}
+
+.violations-panel {
+  margin-bottom: var(--s-4);
+  border: 1px solid var(--accent);
+  border-left-width: 3px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.violations-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border: none;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.violations-head:hover { filter: brightness(0.98); }
+
+.violations-chevron { color: inherit; font-size: var(--fs-xs); }
+
+.violations-body { padding: var(--s-3); }
+
+.violations-intro {
+  margin: 0 0 var(--s-3);
+  font-size: var(--fs-sm);
+}
+
+.violations-group + .violations-group {
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border);
+}
+
+.violations-rule {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.violations-count {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: var(--fs-xs);
+}
+
+.violations-list {
+  margin: var(--s-2) 0 0;
+  padding-left: var(--s-5);
+  display: grid;
+  gap: var(--s-1);
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+}
