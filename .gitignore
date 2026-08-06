@@ -44,3 +44,9 @@ frontend/.env.local
 
 # Packaged Helm charts (regenerate with helm package)
 charts/*.tgz
+
+# Deployment values files — these hold real secrets (auth.secretKey, DB and
+# MCP service passwords). Never commit one.
+roster.yaml
+*-values.yaml
+values-*.yaml

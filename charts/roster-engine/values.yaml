@@ -20,6 +20,17 @@ auth:
   secretKey: ""
   accessTokenExpireMinutes: 1440
 
+  # First web-UI login, created by a post-install job. The API rejects every
+  # request without a login and there is no default account, so leaving the
+  # password empty means you must create the first user by hand:
+  #   kubectl exec deploy/<release>-roster-engine-backend -- \
+  #     python -m app.scripts.create_user <name> <password>
+  # Set the password here and the install does it for you. Existing users are
+  # left alone, so it is safe to redeploy.
+  initialAdmin:
+    username: admin
+    password: ""
+
 postgres:
   user: roster
   password: ""

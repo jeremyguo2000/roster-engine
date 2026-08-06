@@ -1,0 +1,78 @@
+{{- if .Values.auth.initialAdmin.password }}
+# Creates the first web-UI login (and the MCP service account) after install,
+# so a deployment is usable without shelling into the backend pod.
+#
+# Runs as a post-install/post-upgrade hook because it needs the schema to
+# exist: the backend applies migrations on startup, and this job may well win
+# the race. It exits non-zero in that case and the Job retries with backoff.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "roster-engine.fullname" . }}-bootstrap
+  labels:
+    {{- include "roster-engine.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    # Kept after it succeeds so its logs stay readable; replaced on next install.
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 20
+  template:
+    metadata:
+      labels:
+        {{- include "roster-engine.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: OnFailure
+      {{- include "roster-engine.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: bootstrap
+          image: {{ include "roster-engine.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -u
+              # Idempotent: an existing user is success, anything else (no
+              # schema yet, database unreachable) fails so the Job retries.
+              create() {
+                if out=$(python -m app.scripts.create_user "$1" "$2" 2>&1); then
+                  echo "$out"
+                  return 0
+                fi
+                case "$out" in
+                  *"already exists"*) echo "user '$1' already exists — leaving it alone" ;;
+                  *) echo "$out" >&2; return 1 ;;
+                esac
+              }
+              create "$INITIAL_ADMIN_USERNAME" "$INITIAL_ADMIN_PASSWORD"
+              {{- if .Values.mcp.enabled }}
+              create "$ROSTER_SERVICE_USERNAME" "$ROSTER_SERVICE_PASSWORD"
+              {{- end }}
+          env:
+            {{- include "roster-engine.appEnv" . | nindent 12 }}
+            - name: INITIAL_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: INITIAL_ADMIN_USERNAME
+            - name: INITIAL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: INITIAL_ADMIN_PASSWORD
+            {{- if .Values.mcp.enabled }}
+            - name: ROSTER_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: ROSTER_SERVICE_USERNAME
+            - name: ROSTER_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: ROSTER_SERVICE_PASSWORD
+            {{- end }}
+{{- end }}

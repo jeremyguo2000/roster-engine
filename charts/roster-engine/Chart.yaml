@@ -2,5 +2,5 @@ apiVersion: v2
 name: roster-engine
 description: Nurse roster scheduling engine — FastAPI backend, OR-Tools CP-SAT solver worker, MCP server, and React frontend, with bundled PostgreSQL and Redis.
 type: application
-version: 0.2.0
+version: 0.2.1
 appVersion: "0.2.0"
