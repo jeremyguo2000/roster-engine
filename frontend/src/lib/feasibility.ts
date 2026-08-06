@@ -2,10 +2,10 @@
  * Pre-solve feasibility hints for the Generate wizard.
  *
  * Mirrors the solver's hard rules that most often surprise operators:
- *  - C4: every staff member must hit target_work_min EXACTLY, so the target
+ *  - C2: every staff member must hit target_work_min EXACTLY, so the target
  *    must be a sum of shift credits (work_min) achievable within the days
- *    that actually have demands (C8 blocks work on undemanded days).
- *  - C5: coverage checkpoints no shift covers are silently skipped.
+ *    that actually have demands (C6 blocks work on undemanded days).
+ *  - C3: coverage checkpoints no shift covers are silently skipped.
  *  - Leaves reference a shift code that must exist in the profile.
  *
  * Pure functions only — no API calls, so it stays unit-testable.
@@ -63,7 +63,7 @@ function shiftCovers(shift: Shift, cp: number): boolean {
   return s <= cp && cp < (overnight ? e + 1440 : e);
 }
 
-/** Same checkpoint set the solver enforces C5 at (demand start + interior shift edges). */
+/** Same checkpoint set the solver enforces C3 at (demand start + interior shift edges). */
 function checkpoints(demand: DemandRow, workShifts: Shift[]): number[] {
   const dStart = demand.start_min;
   const dEnd = demand.end_min <= demand.start_min ? demand.end_min + 1440 : demand.end_min;
@@ -181,7 +181,7 @@ export function feasibilityHints(input: FeasibilityInput): string[] {
     return hints;
   }
 
-  // ── Target reachability from shift credits within demanded days (C4 + C8) ──
+  // ── Target reachability from shift credits within demanded days (C2 + C6) ──
   const credits = [...new Set(workShifts.map((s) => s.work_min))].filter((c) => c > 0);
   const demandDays = dates.filter((d) => demands.some((row) => row.date === d)).length;
   const emptyDays = dates.length - demandDays;

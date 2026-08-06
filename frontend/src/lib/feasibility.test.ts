@@ -48,7 +48,7 @@ describe("feasibilityHints", () => {
     expect(hints[0]).toContain("Nearest reachable target: 36.67h (5 shifts).");
   });
 
-  it("flags a target needing more days than have demands (C8)", () => {
+  it("flags a target needing more days than have demands (C6)", () => {
     const hints = feasibilityHints(
       base({ demands: demandEveryDay(420, 1020, 3).slice(0, 2), targetWorkMin: 4 * 440 }),
     );

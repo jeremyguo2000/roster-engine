@@ -24,7 +24,7 @@ export interface RosterStaffRef {
 
 /**
  * One rule breach found by the post-solve audit (backend/solver/validate.py).
- * `rule` is the constraint number the solver is meant to enforce ("C1".."C9")
+ * `rule` is the constraint number the solver is meant to enforce ("C1".."C7")
  * or "consec"; `message` is already written for operators.
  */
 export interface RosterViolation {

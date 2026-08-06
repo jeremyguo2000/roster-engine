@@ -25,11 +25,11 @@ MCP tools, see [MCP-guide.md](MCP-guide.md)):
 is approved. The system should record the absence, restore coverage, and
 disturb the published schedule as little as possible.
 
-Most machinery exists already: leaves become pre-assignments, C7 can pin
+Most machinery exists already: leaves become pre-assignments, C5 can pin
 work shifts, chaining carries rest state. Three phases:
 
 **Phase 1 — tail re-solve (no solver changes).** Record the absence as a
-`Leave` with a sick-leave shift code (`MC`, defined like `AL` so C4
+`Leave` with a sick-leave shift code (`MC`, defined like `AL` so C2
 accounting balances). Create a new roster chained off the approved one
 (`roster_start = effective_date`, `num_days` = remaining). Correct, but the
 whole tail reshuffles — MVP only.
@@ -48,10 +48,10 @@ re-solved to stay close to the parent.
   approved rosters only → creates leaves + child roster, dispatches solver.
   Approving the amendment supersedes the parent; discarding leaves it be.
 - Solver (the only engine change): lock parent assignments before
-  `effective_date` as pre-assignments (C7 handles this today); add a churn
+  `effective_date` as pre-assignments (C5 handles this today); add a churn
   term — `minimise weight_churn · Σ(1 − x[n,d,s])` over the parent's future
   assignments, weighted to dominate — so coverage is repaired with the
-  fewest changed cells; soften C4 to slack + penalty in amend mode (exact
+  fewest changed cells; soften C2 to slack + penalty in amend mode (exact
   targets may be unattainable with someone out; report deviations).
 - Edge cases: mid-shift cancellation → lock today as fact, re-solve from
   tomorrow; rosters already chained off the parent get a "successor may need
@@ -72,7 +72,7 @@ By value-for-effort:
 2. **Infeasibility diagnostics** — CP-SAT assumption literals so failures
    say *which* constraint is unsatisfiable, not just "no feasible solution".
 3. **Backend test suite + CI** — none exists; the pure solver is ideal for
-   pytest (solve → assert C1–C9 on output; JSON round-trip tests).
+   pytest (solve → assert C1–C7 on output; JSON round-trip tests).
 4. **Staff preferences** — soft penalty terms ("prefers no Mondays") rather
    than hard constraints, plus fairness on preference satisfaction.
 5. **Cross-roster fairness ledger** — carry cumulative night/weekend burden
@@ -90,8 +90,7 @@ By value-for-effort:
 
 - `DELETE /api/rosters/{id}` hard-deletes approved rosters; `discard`
   refuses them — pick one policy.
-- Constraint numbering skips C2/C3 — kept because docs reference the numbers.
-- C5 silently skips demand checkpoints no shift can cover — a solve can
+- C3 silently skips demand checkpoints no shift can cover — a solve can
   "succeed" while under-covering; worth a warning in the result.
 - CORS allows only `http://localhost:5173`; non-same-origin deployments need
   it configurable.

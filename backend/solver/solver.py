@@ -91,7 +91,7 @@ class RosterContext:
                          Staff with no assignments in the previous roster are absent.
     carry_night_shifts : dict mapping employee_id to a specific shift code for staff
                          who were on an overnight shift on the last day of the previous
-                         roster. Used by C5 to correctly count carryover night staff
+                         roster. Used by C3 to correctly count carryover night staff
                          toward day 0 early morning demand coverage.
  
     Examples
@@ -262,7 +262,7 @@ class RosterEngine:
                                used by C_context to apply ConditionalConstraints across
                                the roster boundary.
         - carry_night_shifts : specific shift code for staff on an overnight shift on the
-                               last day of the roster, used by C5 to count carryover night
+                               last day of the roster, used by C3 to count carryover night
                                staff toward day 0 early morning demand coverage.
         """
         assignments = result["assignments"]
@@ -328,10 +328,10 @@ class RosterEngine:
         num_days        : Length of the roster window in days, including any
                           lookahead days.
         target_work_min : Exact working minutes each staff member must accumulate
-                          over the roster window (enforced by C4).
+                          over the roster window (enforced by C2).
         demands         : Demand objects with specific dates and headcount
                           requirements. Days with no demand are blocked from
-                          receiving any work shift assignments (C8).
+                          receiving any work shift assignments (C6).
         pre_assignments : List of (n, d, s) index tuples representing
                           pre-assigned leave shifts. Built via
                           build_pre_assignments_for_leaves().
@@ -398,7 +398,7 @@ class RosterEngine:
             for d in range(num_days):
                 model.Add(sum(x[n, d, s] for s in work_shifts) <= 1)
 
-        # C4 — Exactly target_minutes of work per staff over the roster
+        # C2 — Exactly target_minutes of work per staff over the roster
         for n in range(num_staff):
             model.Add(
                 sum(
@@ -420,7 +420,7 @@ class RosterEngine:
                         if n is not None:
                             carry_night_coverage.setdefault(shift_idx, []).append(n)
         
-        # Precompute C5: for each demand, the check points and which shifts
+        # Precompute C3: for each demand, the check points and which shifts
         # cover each check point.
         # demand_coverage[(d_idx, check_point)] = list of shift indices covering it
         demand_coverage: list[tuple] = []
@@ -443,7 +443,7 @@ class RosterEngine:
                                 )
                     demand_coverage.append((d, demand, covering, carry_count))
                     
-        # C5 — Demand coverage at each boundary check point
+        # C3 — Demand coverage at each boundary check point
         for d, demand, covering, carry_count in demand_coverage:
             if not covering:
                 continue
@@ -469,7 +469,7 @@ class RosterEngine:
                     ) >= demand.headcount - carry_count
                 )
 
-        # C6 — Permitted work shifts
+        # C4 — Permitted work shifts
         for n, staff in enumerate(staff_list):
             if staff.permitted_shifts:
                 for d in range(num_days):
@@ -477,7 +477,7 @@ class RosterEngine:
                         if shifts[s] not in staff.permitted_shifts:
                             model.Add(x[n, d, s] == 0)
         
-        # C7 — Pre-assignments:
+        # C5 — Pre-assignments:
         #       set all un-assigned rest shifts to 0,
         #       set all pre-assigned shifts to 1,
         #       set all other work shifts on that day to 0.
@@ -498,14 +498,14 @@ class RosterEngine:
                 if s != assigned_shift:
                     model.Add(x[n, d, s] == 0)
                     
-        # C8 — No work shifts on days with no demand
+        # C6 — No work shifts on days with no demand
         for d in range(num_days):
             if not _demands_for_day(demands, roster_start, d):
                 for n in range(num_staff):
                     for s in work_shifts:
                         model.Add(x[n, d, s] == 0)
         
-        # C9 — Dynamic conditional constraints
+        # C7 — Dynamic conditional constraints
         for i, rule in enumerate(self.conditional_constraints):
             trigger_indices = (
                 list(range(num_shifts)) if rule.trigger == "*"

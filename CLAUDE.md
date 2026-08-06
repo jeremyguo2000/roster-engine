@@ -80,6 +80,6 @@ Passing `previous_roster_id` when creating a roster rebuilds the previous result
 ### Solver conventions
 
 - All times are **minutes from midnight** (`start_min`/`end_min` in the DB, `start_time`/`end_time` in the solver). Overnight shifts are encoded as `end_time <= start_time` and handled explicitly throughout (coverage checks, timetable rendering, carryover).
-- Constraints in `generate_roster()` are numbered C1–C9 in comments; refer to them by number when discussing changes.
+- Constraints in `generate_roster()` are numbered C1–C7 in comments; refer to them by number when discussing changes.
 - Leaves are not a constraint of their own — they become pre-assignments of each leave's `shift_code` (default `"AL"`) via `build_pre_assignments_for_leaves()`. The referenced shift code must exist among the profile's shifts or the solve fails.
-- Demand coverage (C5) is enforced only at boundary "check points" (demand start plus shift starts/ends inside the window), not continuously.
+- Demand coverage (C3) is enforced only at boundary "check points" (demand start plus shift starts/ends inside the window), not continuously.

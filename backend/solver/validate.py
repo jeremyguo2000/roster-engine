@@ -11,7 +11,7 @@ MINUTES_PER_DAY = 1440
 @dataclass
 class Violation:
     """A single rule violation found in a solved roster."""
-    rule:        str          # constraint number ("C1".."C9") or "consec"
+    rule:        str          # constraint number ("C1".."C7") or "consec"
     message:     str          # plain-English description for operators
     employee_id: str | None = None
     day:         int | None = None
@@ -31,7 +31,7 @@ def validate_roster(
 ) -> list[Violation]:
     """
     Independently audit a solved roster against the rules the solver was
-    asked to enforce (C1, C4-C9, plus the consecutive-day bookkeeping).
+    asked to enforce (C1, C2-C7, plus the consecutive-day bookkeeping).
 
     Takes the in-memory result dict returned by generate_roster() (the
     tuple-keyed form, before _result_to_json) together with the same
@@ -45,7 +45,7 @@ def validate_roster(
     In particular, demand coverage is checked by walking every minute of
     every demand window, not by sampling check points — so it can also
     surface genuine under-coverage at times no shift covers, which the
-    solver's C5 silently skips.
+    solver's C3 silently skips.
     """
     staff_list: list[Staff] = result["staff"]
     shifts:     list[Shift] = result["shifts"]
@@ -83,7 +83,7 @@ def validate_roster(
                     staff.employee_id, d,
                 ))
 
-    # ── C4: exact target minutes per staff (all shifts count, incl. leaves)
+    # ── C2: exact target minutes per staff (all shifts count, incl. leaves)
     for staff in staff_list:
         total = sum(
             s.work_time
@@ -92,11 +92,11 @@ def validate_roster(
         )
         if total != target_work_min:
             violations.append(Violation(
-                "C4", f"{staff.employee_id} works {total} min, target is {target_work_min} min",
+                "C2", f"{staff.employee_id} works {total} min, target is {target_work_min} min",
                 staff.employee_id,
             ))
 
-    # ── C5: demand coverage, checked minute by minute ───────────────────
+    # ── C3: demand coverage, checked minute by minute ───────────────────
     def on_duty(day: int, minute: int) -> set[str]:
         """Employee ids physically present at `minute` (0-1439) of `day`."""
         on = set()
@@ -144,13 +144,13 @@ def validate_roster(
             if demand.skillset_required:
                 skill = " with " + ", ".join(f"{s.key}={s.value}" for s in demand.skillset_required)
             violations.append(Violation(
-                "C5",
+                "C3",
                 f"Demand {demand.date} {_hhmm(demand.start_time)}-{_hhmm(demand.end_time)} "
                 f"needs {demand.headcount} staff{skill} but has {worst[1]} at {_hhmm(worst[0])}",
                 day=d,
             ))
 
-    # ── C6: only permitted work shifts ──────────────────────────────────
+    # ── C4: only permitted work shifts ──────────────────────────────────
     for staff in staff_list:
         if not staff.permitted_shifts:
             continue
@@ -159,16 +159,16 @@ def validate_roster(
             for sh in work_shifts_on(staff.employee_id, d):
                 if sh.code not in permitted:
                     violations.append(Violation(
-                        "C6", f"{staff.employee_id} assigned non-permitted shift {sh.code} on day {d}",
+                        "C4", f"{staff.employee_id} assigned non-permitted shift {sh.code} on day {d}",
                         staff.employee_id, d,
                     ))
 
-    # ── C7: pre-assigned leaves honoured; no stray rest shifts ──────────
+    # ── C5: pre-assigned leaves honoured; no stray rest shifts ──────────
     for n, d, s_idx in pre_assigned:
         emp_id, code = staff_list[n].employee_id, shifts[s_idx].code
         if code not in {sh.code for sh in assigned.get((emp_id, d), [])}:
             violations.append(Violation(
-                "C7", f"Pre-assigned {code} for {emp_id} on day {d} is missing",
+                "C5", f"Pre-assigned {code} for {emp_id} on day {d} is missing",
                 emp_id, d,
             ))
     for (emp_id, d), shs in assigned.items():
@@ -178,11 +178,11 @@ def validate_roster(
             n, s_idx = emp_to_n.get(emp_id), code_to_s.get(sh.code)
             if (n, d, s_idx) not in pre_assigned:
                 violations.append(Violation(
-                    "C7", f"{emp_id} has rest shift {sh.code} on day {d} that was never pre-assigned",
+                    "C5", f"{emp_id} has rest shift {sh.code} on day {d} that was never pre-assigned",
                     emp_id, d,
                 ))
 
-    # ── C8: no work on days with no demand ──────────────────────────────
+    # ── C6: no work on days with no demand ──────────────────────────────
     demand_days = {day_of_date[dem.date] for dem in demands if dem.date in day_of_date}
     for d in range(num_days):
         if d in demand_days:
@@ -190,11 +190,11 @@ def validate_roster(
         for staff in staff_list:
             for sh in work_shifts_on(staff.employee_id, d):
                 violations.append(Violation(
-                    "C8", f"{staff.employee_id} works {sh.code} on day {d}, which has no demand",
+                    "C6", f"{staff.employee_id} works {sh.code} on day {d}, which has no demand",
                     staff.employee_id, d,
                 ))
 
-    # ── C9: conditional if/then rules, incl. carry-over from context ────
+    # ── C7: conditional if/then rules, incl. carry-over from context ────
     def group_codes(group: str) -> set[str]:
         if group == "*":
             return set(shift_by_code)
@@ -207,14 +207,14 @@ def validate_roster(
         at_target = {sh.code for sh in assigned.get((emp_id, target_d), [])}
         if rule.enforce_val == 0 and at_target & enforce:
             violations.append(Violation(
-                "C9",
+                "C7",
                 f"{emp_id} has {', '.join(sorted(at_target & enforce))} on day {target_d}, "
                 f"blocked by rule ({origin})",
                 emp_id, target_d,
             ))
         elif rule.enforce_val == 1 and not enforce <= at_target:
             violations.append(Violation(
-                "C9",
+                "C7",
                 f"{emp_id} is missing forced shift(s) {', '.join(sorted(enforce - at_target))} "
                 f"on day {target_d} ({origin})",
                 emp_id, target_d,
