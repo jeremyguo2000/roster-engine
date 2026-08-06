@@ -1,0 +1,7 @@
+# Test-only dependencies. The dev image installs this file; the production
+# image (backend/Dockerfile) installs requirements.txt alone, since it never
+# copies backend/tests/.
+-r requirements.txt
+
+pytest==9.1.1
+pytest-asyncio==1.4.0
