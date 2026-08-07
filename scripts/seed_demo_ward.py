@@ -6,6 +6,8 @@ Shift work_min is a uniform 440-min credit — exact-hours targets need uniform
 credits to stay feasible (see documentation/operators-manual.html, gotcha 1).
 """
 import sys
+from datetime import date, timedelta
+
 import requests
 
 API = "http://localhost:8000/api"
@@ -51,11 +53,22 @@ for code, label, gid, start, end, brk in SHIFTS:
         "start_min": sm, "end_min": em, "work_min": 440, "break_min": span - 440,
     })["id"]
 
-# AL leave shift: counts 440 min toward target hours (a "paid day")
-shift_ids["AL"] = post("/shifts", {
-    "group_id": lvs, "code": "AL", "name": "Annual Leave",
-    "start_min": 0, "end_min": 0, "work_min": 440, "break_min": 0,
-})["id"]
+# Leave shifts. Each credits the same 440 min as a worked day, so a paid
+# absence keeps the exact-hours target (C2) satisfiable. The distinction
+# between them is operational, not mathematical: AL is planned and the solver
+# schedules around it, while MC and HL arrive after a roster is published and
+# are recorded against it. Unpaid leave would need a 0-min credit, which C2
+# cannot currently accommodate — see DESIGN.md §4.
+LEAVE_SHIFTS = [
+    ("AL", "Annual Leave"),
+    ("MC", "Medical Leave"),          # outpatient sick leave, certified
+    ("HL", "Hospitalisation Leave"),
+]
+for code, name in LEAVE_SHIFTS:
+    shift_ids[code] = post("/shifts", {
+        "group_id": lvs, "code": code, "name": name,
+        "start_min": 0, "end_min": 0, "work_min": 440, "break_min": 0,
+    })["id"]
 
 # ── Skills ──────────────────────────────────────────────────────
 sen = post("/skills/types", {"name": "seniority", "description": "SN = staff nurse, EN = enrolled nurse"})["id"]
@@ -99,10 +112,24 @@ post(f"/profiles/{prof}/staff/add-group/{grp}", {})
 for sid_ in shift_ids.values():
     post(f"/profiles/{prof}/shifts", {"shift_id": sid_})
 
-# ── A few leaves in the demo window (13–26 Jul 2026) ────────────
-for sid, d in [(staff_ids[0], "2026-07-15"), (staff_ids[5], "2026-07-20"),
-               (staff_ids[5], "2026-07-21"), (staff_ids[20], "2026-07-17")]:
-    post("/staff/leaves", {"staff_id": sid, "date": d, "shift_code": "AL"})
+# ── A few booked leaves in the demo fortnight ───────────────────
+# The window is the fortnight starting next Monday, computed at run time: a
+# seed with hard-coded dates silently rots into the past, and leave booked
+# before today makes no sense to demo against.
+today  = date.today()
+monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
+
+# (staff index, day offset into the window) — planned annual leave only.
+# Unplanned absences are the sick-call flow's job, recorded against a roster
+# after it is approved.
+for idx, offset in [(0, 2), (5, 7), (5, 8), (20, 4)]:
+    post("/staff/leaves", {
+        "staff_id": staff_ids[idx],
+        "date": (monday + timedelta(days=offset)).isoformat(),
+        "shift_code": "AL",
+    })
 
 print(f"profile_id={prof}")
-print("Seeded: 4 shift groups, 11 shifts, 2 skill types, 30 nurses, 1 profile, 4 leaves")
+print(f"Demo fortnight: {monday} to {monday + timedelta(days=13)}")
+print(f"Seeded: 4 shift groups, {len(shift_ids)} shifts, 2 skill types, "
+      f"{len(staff_ids)} nurses, 1 profile, 4 leaves")

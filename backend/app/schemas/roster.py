@@ -46,5 +46,56 @@ class RosterCreate(BaseModel):
     previous_roster_id: int | None = None
  
 class RosterOut(RosterListItem):
+    # Untyped: the solver result has no declared shape anywhere in the system.
+    # See DESIGN.md §5 — this is the field that note is about.
     result: dict | None
+
+
+# ── Replacement suggestions (sick-call flow) ────────────────────────────────
+# Unlike `result` above, this payload is declared, so OpenAPI carries it and
+# the frontend has something authoritative to type against.
+
+class ShiftRef(BaseModel):
+    code: str
+    name: str
+    start_time: int
+    end_time: int
+    work_time: int
+
+class CoverageGapOut(BaseModel):
+    """A demand left short once the absent staff member is removed."""
+    date: date
+    start_time: int
+    end_time: int
+    headcount: int
+    present: int
+    short_by: int
+    worst_minute: int
+    skills_required: list[str]
+    description: str
+
+class ReplacementCandidateOut(BaseModel):
+    """One staff member who could cover, and what it would cost them."""
+    employee_id: str
+    fullname: str
+    consec_run: int
+    work_min_before: int
+    work_min_after: int
+    target_delta: int
+    nights: int
+    weekends: int
+    covers_gaps: bool
+    notes: list[str]
+
+class ReplacementsOut(BaseModel):
+    absent_employee_id: str
+    absent_fullname: str
+    day: int
+    date: date
+    shift: ShiftRef | None
+    gaps: list[CoverageGapOut]
+    candidates: list[ReplacementCandidateOut]
+    # Why everyone else was ruled out: reason -> how many staff.
+    excluded: dict[str, int]
+    message: str | None
  

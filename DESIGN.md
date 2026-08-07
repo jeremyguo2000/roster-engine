@@ -99,6 +99,19 @@ By value-for-effort:
 - CORS allows only `http://localhost:5173`; non-same-origin deployments need
   it configurable.
 - `solver/display.py` helpers are debug-only (per-cell dict scans).
+- **Unpaid leave cannot be expressed.** A leave is a rest shift whose
+  `work_min` credits the target, and C2 demands *exactly* `target_work_min`.
+  Unpaid leave credits nothing, so that staff member's row becomes
+  unsatisfiable — and the target is per-roster, not per-staff, so it cannot be
+  lowered for them alone. Every leave type in the seed is therefore paid
+  (AL/MC/HL, 440 min each). Supporting NPL means either a per-staff target or
+  softening C2 to slack + penalty, the same change §2 Phase 2 needs.
+- **A roster does not record what it was chained from.** `previous_roster_id`
+  is an argument to the solver task, never a column, so once a solve finishes
+  the link is gone. Anything reasoning about a solved roster after the fact —
+  replacement suggestions especially — cannot rebuild the `RosterContext`, so
+  a rest rule triggered by a shift in the *previous* roster is invisible to
+  it. Persisting the link is a one-column migration.
 
 ## 5. The solver result has no declared type
 

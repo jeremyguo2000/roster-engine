@@ -1,14 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from datetime import timedelta
+from datetime import date, timedelta
 
 from app.database import get_db
 from app.models import (
     Roster, RosterStatus, RosterDemand, Demand, Profile, Leave, SkillValue, User
 )
 from app.dependencies.auth import get_current_user
-from app.schemas.roster import RosterListItem, RosterCreate, RosterOut, DemandOut
+from app.roster_inputs import build_solver_inputs, conditional_constraints, rebuild_result
+from app.schemas.roster import (
+    CoverageGapOut, DemandOut, ReplacementCandidateOut, ReplacementsOut,
+    RosterCreate, RosterListItem, RosterOut, ShiftRef,
+)
 from app.worker.tasks import run_solver
+from solver.swaps import suggest_replacements
 
 router = APIRouter(prefix="/rosters", tags=["Rosters"])
 
@@ -171,6 +176,85 @@ def get_roster_leaves(roster_id: int, db: Session = Depends(get_db),
         }
         for lv in leaves
     ]
+
+
+@router.get("/{roster_id}/replacements", response_model=ReplacementsOut)
+def get_replacements(
+    roster_id: int,
+    employee_id: str,
+    absence_date: date,
+    limit: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Who could cover `employee_id`'s shift on `absence_date` — the sick-call
+    question, answered from the solved roster without running the solver.
+
+    Ranks staff who are off duty, permitted the shift, qualified for whatever
+    coverage it was holding up, and clear of the rest rules. Contracted hours
+    are reported per candidate rather than filtered on: covering an extra shift
+    is overtime, and that is the operator's call to make.
+
+    Note the roster's chain link is not persisted (DESIGN.md §4), so a rest
+    rule triggered by a shift in the *previous* roster cannot be seen here.
+    """
+    roster = db.get(Roster, roster_id)
+    if not roster:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Roster not found.")
+    if not roster.result or "assignments" not in roster.result:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Roster {roster_id} has no solved result to suggest replacements from.",
+        )
+
+    day = (absence_date - roster.roster_start).days
+    if not 0 <= day < roster.num_days:
+        last = roster.roster_start + timedelta(days=roster.num_days - 1)
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"{absence_date} is outside this roster ({roster.roster_start} to {last}).",
+        )
+
+    shifts, staff, demands, _ = build_solver_inputs(db, roster)
+    try:
+        result = rebuild_result(roster, shifts, staff, demands)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    out = suggest_replacements(
+        result,
+        absent_employee_id=employee_id,
+        day=day,
+        target_work_min=roster.target_work_min,
+        conditional_constraints=conditional_constraints(roster.profile),
+        limit=limit,
+    )
+
+    return ReplacementsOut(
+        absent_employee_id=out.absent_employee_id,
+        absent_fullname=out.absent_fullname,
+        day=out.day,
+        date=out.date,
+        shift=ShiftRef(
+            code=out.shift.code, name=out.shift.name,
+            start_time=out.shift.start_time, end_time=out.shift.end_time,
+            work_time=out.shift.work_time,
+        ) if out.shift else None,
+        gaps=[
+            CoverageGapOut(
+                date=g.date, start_time=g.start_time, end_time=g.end_time,
+                headcount=g.headcount, present=g.present, short_by=g.short_by,
+                worst_minute=g.worst_minute,
+                skills_required=[f"{s.key}={s.value}" for s in g.skills_required],
+                description=g.describe(),
+            )
+            for g in out.gaps
+        ],
+        candidates=[ReplacementCandidateOut(**vars(c)) for c in out.candidates],
+        excluded=out.excluded,
+        message=out.message,
+    )
 
 
 @router.post("/{roster_id}/approve", response_model=RosterOut)
