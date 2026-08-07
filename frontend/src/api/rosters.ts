@@ -23,15 +23,25 @@ export interface RosterStaffRef {
 }
 
 /**
- * One rule breach found by the post-solve audit (backend/solver/validate.py).
- * `rule` is the constraint number the solver is meant to enforce ("C1".."C7")
- * or "consec"; `message` is already written for operators.
+ * One rule breach found by the post-solve audit.
+ *
+ * `rule` is the stable identity ("rest_rules", "shift_cover", …), `label` is
+ * that rule in words for operators, and `constraint` cross-references the
+ * matching block in generate_roster() ("C1".."C7"; null for rules with no
+ * constraint number). `message` is already written for operators.
+ *
+ * Hand-written against the Violation dataclass in backend/solver/rules.py,
+ * with nothing enforcing that the two agree — see DESIGN.md §5. Treat every
+ * field the backend might omit as optional: `label` and `constraint` fall
+ * back to `rule` in the panel.
  */
 export interface RosterViolation {
   rule: string;
   message: string;
   employee_id?: string | null;
   day?: number | null;
+  label?: string;
+  constraint?: string | null;
 }
 
 export interface RosterResult {

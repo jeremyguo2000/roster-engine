@@ -26,8 +26,18 @@ describe("RosterViolations", () => {
     render(
       <RosterViolations
         violations={[
-          { rule: "C2", message: "E001 works 2640 min, target is 2200 min" },
-          { rule: "C1", message: "E002 has 2 work shifts on day 3: AM,PM" },
+          {
+            rule: "contracted_hours",
+            label: "Contracted hours",
+            constraint: "C2",
+            message: "E001 works 2640 min, target is 2200 min",
+          },
+          {
+            rule: "one_shift_per_day",
+            label: "One shift per day",
+            constraint: "C1",
+            message: "E002 has 2 work shifts on day 3: AM,PM",
+          },
         ]}
       />,
     );
@@ -36,8 +46,36 @@ describe("RosterViolations", () => {
     expect(screen.getByText(/E002 has 2 work shifts/)).toBeInTheDocument();
   });
 
+  it("heads each group with the rule in words, not the constraint number", () => {
+    // A ward manager reads this panel; "C2" alone means nothing to them. The
+    // number stays visible but subordinate, for cross-referencing the solver.
+    render(
+      <RosterViolations
+        violations={[
+          {
+            rule: "rest_rules",
+            label: "Rest rules",
+            constraint: "C7",
+            message: "E001 has D079 on day 4, blocked by rule",
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Rest rules")).toBeInTheDocument();
+    expect(screen.getByText("C7")).toBeInTheDocument();
+  });
+
+  it("falls back to the rule id when the backend sends no label", () => {
+    render(
+      <RosterViolations
+        violations={[{ rule: "shift_cover", message: "Demand short at 07:00" }]}
+      />,
+    );
+    expect(screen.getByText("shift_cover")).toBeInTheDocument();
+  });
+
   it("singularises the count for a lone violation", () => {
-    render(<RosterViolations violations={[{ rule: "C5", message: "x" }]} />);
+    render(<RosterViolations violations={[{ rule: "booked_leave", message: "x" }]} />);
     expect(screen.getByText(/1 rule violation found/i)).toBeInTheDocument();
   });
 
@@ -45,21 +83,25 @@ describe("RosterViolations", () => {
     render(
       <RosterViolations
         violations={[
-          { rule: "C2", message: "E001 off target" },
-          { rule: "C2", message: "E002 off target" },
-          { rule: "C1", message: "E003 double-booked" },
+          { rule: "contracted_hours", label: "Contracted hours", message: "E001 off target" },
+          { rule: "contracted_hours", label: "Contracted hours", message: "E002 off target" },
+          { rule: "one_shift_per_day", label: "One shift per day", message: "E003 double-booked" },
         ]}
       />,
     );
     // Two rule groups, not three rows — a systemic breach should read as one problem.
-    expect(screen.getAllByText(/^C2$/)).toHaveLength(1);
-    expect(screen.getAllByText(/^C1$/)).toHaveLength(1);
+    expect(screen.getAllByText(/^Contracted hours$/)).toHaveLength(1);
+    expect(screen.getAllByText(/^One shift per day$/)).toHaveLength(1);
     expect(screen.getByText(/2 issues/)).toBeInTheDocument();
     expect(screen.getByText(/1 issue$/)).toBeInTheDocument();
   });
 
   it("can be collapsed so it doesn't dominate the page", async () => {
-    render(<RosterViolations violations={[{ rule: "C2", message: "E001 off target" }]} />);
+    render(
+      <RosterViolations
+        violations={[{ rule: "contracted_hours", label: "Contracted hours", message: "E001 off target" }]}
+      />,
+    );
     expect(screen.getByText(/E001 off target/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { expanded: true }));

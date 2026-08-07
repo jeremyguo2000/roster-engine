@@ -69,22 +69,26 @@ Phase 2. Groundwork for manual roster editing generally.
 By value-for-effort:
 
 1. **Cancellations/amendments** — §2.
-2. **Infeasibility diagnostics** — CP-SAT assumption literals so failures
+2. **Declare the solver result** — §5. The largest structural debt: the
+   result payload has no type anywhere in the system.
+3. **Infeasibility diagnostics** — CP-SAT assumption literals so failures
    say *which* constraint is unsatisfiable, not just "no feasible solution".
-3. **Backend test suite + CI** — none exists; the pure solver is ideal for
-   pytest (solve → assert C1–C7 on output; JSON round-trip tests).
-4. **Staff preferences** — soft penalty terms ("prefers no Mondays") rather
+4. **Solver tests + CI** — `backend/tests/` covers the tooling layer only
+   (22 tests, no CI runs them). The pure solver is ideal for pytest:
+   solve → assert C1–C7 on the output; JSON round-trip tests.
+5. **Staff preferences** — soft penalty terms ("prefers no Mondays") rather
    than hard constraints, plus fairness on preference satisfaction.
-5. **Cross-roster fairness ledger** — carry cumulative night/weekend burden
+6. **Cross-roster fairness ledger** — carry cumulative night/weekend burden
    in `RosterContext` so debts even out over months instead of resetting.
-6. **Warm starts** — `AddHint()` from the previous/parent solution to cut
+7. **Warm starts** — `AddHint()` from the previous/parent solution to cut
    solve times.
-7. **Export & notifications** — per-staff ICS/Excel; notify staff on
-   approve/amend.
-8. **RBAC** — planner vs viewer roles; later a staff self-service view
+8. **Export & notifications** — the roster grid and both timetables already
+   export to xlsx (`frontend/src/lib/rosterExport.ts`, `timetableExport.ts`).
+   Still missing: *per-staff* ICS/Excel, and notifying staff on approve/amend.
+9. **RBAC** — planner vs viewer roles; later a staff self-service view
    building on Phase 3 swaps.
-9. **Multi-ward staffing** — shared staff pool across profiles with
-   borrowing rules.
+10. **Multi-ward staffing** — shared staff pool across profiles with
+    borrowing rules.
 
 ## 4. Known rough edges
 
@@ -95,3 +99,59 @@ By value-for-effort:
 - CORS allows only `http://localhost:5173`; non-same-origin deployments need
   it configurable.
 - `solver/display.py` helpers are debug-only (per-cell dict scans).
+
+## 5. The solver result has no declared type
+
+The single largest piece of structural debt, recorded here because it is
+invisible until it bites and then it bites in three places at once.
+
+`solver/` declares a dataclass for every *input* it takes — `Shift`, `Staff`,
+`Demand`, `ShiftGroup` — and nothing for the result it returns. The shape of
+that result is defined implicitly, by a function: `_result_to_json()` in
+`app/worker/tasks.py`. Every other part of the system then re-asserts that
+shape by hand:
+
+| Where | How the shape is expressed |
+|---|---|
+| `generate_roster()` | a plain `dict`, documented in a docstring |
+| `_result_to_json()` | the *de facto* definition — a dict literal |
+| `_json_to_result()` | a second, independent reading of the same keys |
+| `RosterOut.result` | `dict \| None`, so OpenAPI emits an opaque object |
+| `frontend/src/api/rosters.ts` | hand-written TS interfaces mirroring all of it |
+
+Nothing checks that these five agree. `_result_to_json` and `_json_to_result`
+must already be edited in lockstep (CLAUDE.md says so explicitly) — that
+instruction exists *because* the type doesn't.
+
+The contrast is visible in one response schema: `RosterOut.status` appears in
+OpenAPI as `$ref: RosterStatus`, because `RosterStatus` is a declared enum,
+while `result` appears as `{"additionalProperties": true, "type": "object"}`.
+Same endpoint, same file — one field is typed and one is a blob. The frontend
+has 37 hand-written interfaces across 9 API modules and no codegen tooling, so
+this is the pattern everywhere, not a one-off.
+
+A second smell rides along: `roster.result` holds two unrelated shapes — a
+solved roster, or `{"error": "..."}` when the solve fails. Any declared type
+has to be a union, and making that explicit is part of the fix rather than an
+obstacle to it.
+
+**Target, in dependency order.** Each step is useful alone:
+
+1. **Declare the result in `solver/`** as a dataclass, returned by
+   `generate_roster()`. The layer that produces it owns its shape.
+   `_result_to_json` / `_json_to_result` become serialization *of a declared
+   type* rather than the definition of one.
+2. **Declare the API projection** in `app/schemas/` (Pydantic), typed as a
+   union of solved-result and error, so OpenAPI carries the real shape.
+3. **Generate the TypeScript** from the OpenAPI schema (`openapi-typescript`
+   plus an npm script), deleting the hand-written mirrors. Drift stops being
+   a thing you avoid by discipline and becomes impossible.
+
+Step 3 without steps 1–2 is worthless: generating from `additionalProperties:
+true` yields `Record<string, unknown>`. Step 2 without step 3 is an
+improvement, not a fix — two hand-maintained definitions instead of three.
+
+Not done yet because it touches the solver's return signature, the Celery
+task, chaining, the audit and the frontend at once, and delivers no
+user-visible change. It should be done before the result grows another
+consumer.

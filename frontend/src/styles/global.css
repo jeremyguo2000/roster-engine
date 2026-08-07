@@ -875,14 +875,20 @@ a.workflow-step:hover { background: var(--hover); text-decoration: none; }
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
-  font-family: var(--font-mono);
   font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--ink);
 }
 
+/* The constraint number (C1..C7) — a cross-reference into the solver for
+   anyone reading the design docs, so it stays monospace and recedes. */
+.violations-constraint {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: var(--fs-xs);
+}
+
 .violations-count {
-  font-family: var(--font-sans);
   font-weight: 400;
   font-size: var(--fs-xs);
 }

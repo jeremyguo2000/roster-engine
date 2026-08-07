@@ -61,7 +61,12 @@ export default function RosterViolations({
           {[...byRule.entries()].map(([rule, items]) => (
             <div key={rule} className="violations-group">
               <div className="violations-rule">
-                {rule}
+                {items[0].label ?? rule}
+                {items[0].constraint && (
+                  <span className="muted violations-constraint">
+                    {items[0].constraint}
+                  </span>
+                )}
                 <span className="muted violations-count">
                   {items.length} issue{items.length === 1 ? "" : "s"}
                 </span>
