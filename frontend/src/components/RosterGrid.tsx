@@ -13,7 +13,27 @@ function addDays(iso: string, n: number): Date {
   return out;
 }
 
-export default function RosterGrid({ result }: { result: RosterResult }) {
+/** Local-date ISO string. toISOString() would shift the date in any timezone behind UTC. */
+function isoDate(d: Date): string {
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+export default function RosterGrid({
+  result,
+  onAbsence,
+}: {
+  result: RosterResult;
+  /**
+   * Called when a worked cell is clicked — the sick-call entry point. Only
+   * work shifts are clickable: there is nothing to cover on a rest day, and
+   * leave is already accounted for in the solve.
+   */
+  onAbsence?: (employeeId: string, fullname: string, date: string) => void;
+}) {
   const { roster_start, num_days, staff, shifts, assignments } = result;
   const days = Array.from({ length: num_days }, (_, i) => addDays(roster_start, i));
 
@@ -139,11 +159,23 @@ export default function RosterGrid({ result }: { result: RosterResult }) {
                 const info = code ? shifts[code] : undefined;
                 const c = info ? colourOf(info.group) : undefined;
                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                const canReplace = Boolean(onAbsence && info?.is_work_shift);
                 return (
                   <td
                     key={i}
-                    title={info ? `${s.fullname} · ${code} · ${info.name}` : undefined}
+                    title={
+                      canReplace
+                        ? `${s.fullname} · ${code} · ${info!.name} — click if they can't work it`
+                        : info
+                          ? `${s.fullname} · ${code} · ${info.name}`
+                          : undefined
+                    }
                     className="mono"
+                    onClick={
+                      canReplace
+                        ? () => onAbsence!(s.employee_id, s.fullname, isoDate(d))
+                        : undefined
+                    }
                     style={{
                       padding: "6px 4px",
                       borderBottom: "1px solid var(--border)",
@@ -152,6 +184,7 @@ export default function RosterGrid({ result }: { result: RosterResult }) {
                       color: c ?? "var(--muted)",
                       fontWeight: 500,
                       fontSize: 11,
+                      cursor: canReplace ? "pointer" : undefined,
                     }}
                   >
                     {code ?? "—"}

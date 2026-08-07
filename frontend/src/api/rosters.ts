@@ -120,3 +120,64 @@ export const discardRoster = (id: number) =>
 
 export const deleteRoster = (id: number) =>
   api.delete(`/rosters/${id}`).then(() => undefined);
+
+/**
+ * Replacement suggestions for a single absence — the sick-call flow.
+ *
+ * These types match `ReplacementsOut` and friends in
+ * backend/app/schemas/roster.py, which — unlike `Roster.result` — is a
+ * declared Pydantic model, so the shape is in the OpenAPI schema and could be
+ * generated from it (DESIGN.md §5).
+ */
+export interface CoverageGap {
+  date: string;
+  start_time: number;
+  end_time: number;
+  headcount: number;
+  present: number;
+  short_by: number;
+  worst_minute: number;
+  skills_required: string[];
+  description: string;
+}
+
+export interface ReplacementCandidate {
+  employee_id: string;
+  fullname: string;
+  /** Consecutive working days they'd be on, counting this shift. */
+  consec_run: number;
+  work_min_before: number;
+  work_min_after: number;
+  /** Minutes over (+) or under (−) contracted hours if they take it. */
+  target_delta: number;
+  nights: number;
+  weekends: number;
+  /** Meets the skills every open coverage gap asks for. */
+  covers_gaps: boolean;
+  notes: string[];
+}
+
+export interface Replacements {
+  absent_employee_id: string;
+  absent_fullname: string;
+  day: number;
+  date: string;
+  shift: { code: string; name: string; start_time: number; end_time: number; work_time: number } | null;
+  gaps: CoverageGap[];
+  candidates: ReplacementCandidate[];
+  /** Why everyone else was ruled out: reason → how many staff. */
+  excluded: Record<string, number>;
+  message: string | null;
+}
+
+export const getReplacements = (
+  rosterId: number,
+  employeeId: string,
+  absenceDate: string,
+  limit?: number,
+) =>
+  api
+    .get<Replacements>(`/rosters/${rosterId}/replacements`, {
+      params: { employee_id: employeeId, absence_date: absenceDate, limit },
+    })
+    .then((r) => r.data);

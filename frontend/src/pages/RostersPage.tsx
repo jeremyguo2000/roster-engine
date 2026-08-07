@@ -20,6 +20,7 @@ import { useToast } from "../components/Toast";
 import RosterGrid from "../components/RosterGrid";
 import RosterSummary from "../components/RosterSummary";
 import RosterViolations from "../components/RosterViolations";
+import ReplacementsModal from "../components/ReplacementsModal";
 import Calendar from "../components/Calendar";
 import DayTimetable from "../components/DayTimetable";
 import RangeTimetable from "../components/RangeTimetable";
@@ -222,6 +223,9 @@ function RosterDetailView({ roster }: { roster: Roster }) {
     queryKey: ["roster", roster.id],
     queryFn: () => getRoster(roster.id),
   });
+  const [absence, setAbsence] = useState<
+    { employeeId: string; fullname: string; date: string } | null
+  >(null);
 
   if (detailQ.isLoading) return <div className="empty-state">Loading…</div>;
   if (detailQ.isError) return <div className="empty-state">Failed to load roster.</div>;
@@ -234,8 +238,24 @@ function RosterDetailView({ roster }: { roster: Roster }) {
       {/* Above the grid: if the solver broke its own rules, that's the first
           thing an operator needs to know, before they read the schedule. */}
       <RosterViolations violations={detail.result.violations} />
-      <RosterGrid result={detail.result} />
+      <p className="muted grid-hint">
+        Someone called in sick? Click their shift to see who could cover it.
+      </p>
+      <RosterGrid
+        result={detail.result}
+        onAbsence={(employeeId, fullname, date) => setAbsence({ employeeId, fullname, date })}
+      />
       <RosterSummary result={detail.result} />
+
+      {absence && (
+        <ReplacementsModal
+          rosterId={roster.id}
+          employeeId={absence.employeeId}
+          fullname={absence.fullname}
+          date={absence.date}
+          onClose={() => setAbsence(null)}
+        />
+      )}
     </>
   );
 }
