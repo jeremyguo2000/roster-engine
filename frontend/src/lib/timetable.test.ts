@@ -44,6 +44,8 @@ function makeApproved(result: RosterResult, id = 1): RosterDetail {
     num_days: result.num_days,
     target_work_min: 2400,
     celery_task_id: null,
+    created_at: "2026-01-01T00:00:00Z",
+    finished_at: "2026-01-01T00:05:00Z",
     result,
   };
 }

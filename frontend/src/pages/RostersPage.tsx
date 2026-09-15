@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -17,6 +17,7 @@ import { groupColour, groupColourFor } from "../lib/colours";
 import { exportRosterToXlsx } from "../lib/rosterExport";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import RosterGrid from "../components/RosterGrid";
 import RosterSummary from "../components/RosterSummary";
 import RosterViolations from "../components/RosterViolations";
@@ -147,11 +148,45 @@ export default function RostersPage() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Ticks once a second so callers re-render without polling the roster list. */
+function useElapsedSeconds(sinceIso: string): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return Math.max(0, Math.floor((now - new Date(sinceIso).getTime()) / 1000));
+}
+
+function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m ${sec}s`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function ElapsedTimer({ since }: { since: string }) {
+  const elapsed = useElapsedSeconds(since);
+  return <span className="mono">{formatDuration(elapsed)}</span>;
+}
+
 function RosterMeta({ roster }: { roster: Roster }) {
+  const solveSeconds = roster.finished_at
+    ? (new Date(roster.finished_at).getTime() - new Date(roster.created_at).getTime()) / 1000
+    : null;
   return (
     <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: 4 }}>
       {roster.profile_name} · <span className="mono">{roster.roster_start}</span> · {roster.num_days} day{roster.num_days === 1 ? "" : "s"}
       {" · "}target {(roster.target_work_min / 60).toFixed(1)}h / staff
+      {roster.status === "running" && (
+        <>{" · "}<ElapsedTimer since={roster.created_at} /></>
+      )}
+      {solveSeconds !== null && (
+        <>{" · solved in "}<span className="mono">{formatDuration(solveSeconds)}</span></>
+      )}
     </div>
   );
 }
@@ -395,6 +430,7 @@ function RegenerateButton({ roster }: { roster: Roster }) {
 function DiscardButton({ roster, onAfter }: { roster: Roster; onAfter?: () => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const askConfirm = useConfirm();
   const isApproved = roster.status === "approved";
   const mut = useMutation({
     mutationFn: () => (isApproved ? deleteRoster(roster.id) : discardRoster(roster.id)),
@@ -405,13 +441,26 @@ function DiscardButton({ roster, onAfter }: { roster: Roster; onAfter?: () => vo
     },
     onError: (e) => toast(errorMessage(e, isApproved ? "Delete failed" : "Discard failed"), "error"),
   });
-  const confirmMsg = isApproved
-    ? `${roster.name} is approved. Permanently delete? This cannot be undone.`
-    : `Discard ${roster.name}?`;
   return (
     <button
       className="btn btn-sm btn-danger"
-      onClick={() => confirm(confirmMsg) && mut.mutate()}
+      onClick={async () => {
+        const ok = await askConfirm(
+          isApproved
+            ? {
+                title: `Permanently delete ${roster.name}?`,
+                body: "This roster is approved. Deleting it cannot be undone.",
+                confirmLabel: "Delete",
+                danger: true,
+              }
+            : {
+                title: `Discard ${roster.name}?`,
+                confirmLabel: "Discard",
+                danger: true,
+              },
+        );
+        if (ok) mut.mutate();
+      }}
       disabled={mut.isPending}
     >
       {isApproved ? "Delete" : "Discard"}

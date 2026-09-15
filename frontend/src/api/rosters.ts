@@ -74,6 +74,8 @@ export interface Roster {
   num_days: number;
   target_work_min: number;
   celery_task_id: string | null;
+  created_at: string;
+  finished_at: string | null;
 }
 
 export interface RosterDetail extends Roster {

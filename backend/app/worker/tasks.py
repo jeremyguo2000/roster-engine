@@ -1,5 +1,6 @@
 import logging
 from dataclasses import asdict
+from datetime import datetime
 
 from app.database import SessionLocal
 from app.models import Roster, RosterStatus
@@ -186,6 +187,7 @@ def run_solver(self, roster_id: int, time_limit: int = 600, previous_roster_id: 
             context=context,
         )
 
+        roster.finished_at = datetime.utcnow()
         if result is None:
             roster.status = RosterStatus.failed
             roster.result = {"error": "No feasible solution found within time limit."}
@@ -220,6 +222,7 @@ def run_solver(self, roster_id: int, time_limit: int = 600, previous_roster_id: 
             if roster:
                 roster.status = RosterStatus.failed
                 roster.result = {"error": str(exc)}
+                roster.finished_at = datetime.utcnow()
                 db.commit()
         except Exception:
             pass

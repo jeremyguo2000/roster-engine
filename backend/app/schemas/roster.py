@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel
  
 from app.models.roster import RosterStatus
@@ -29,6 +29,8 @@ class RosterListItem(BaseModel):
     num_days: int
     target_work_min: int
     celery_task_id: str | None
+    created_at: datetime
+    finished_at: datetime | None
     model_config = {"from_attributes": True}
         
 class RosterCreate(BaseModel):

@@ -17,6 +17,8 @@ function roster(over: Partial<Roster> & Pick<Roster, "id" | "roster_start" | "nu
     target_work_min: 2400,
     celery_task_id: null,
     ...over,
+    created_at: over.created_at ?? "2026-01-01T00:00:00Z",
+    finished_at: over.finished_at ?? null,
   };
 }
 

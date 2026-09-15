@@ -188,7 +188,7 @@ class RosterEngine:
         weight_burden:           int   = 10,
         weight_night:            int   = 2,
         weight_weekend:          int   = 1,
-        time_limit_s:            int   = 600,
+        time_limit_s:            int   = 300,
     ):
         self.shifts                  = shifts
         self.staff_list              = staff_list
