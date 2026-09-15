@@ -12,6 +12,7 @@ import {
 import { errorMessage } from "../api/client";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import ProfileShiftsTab from "../components/profiles/ProfileShiftsTab";
 import ProfileStaffTab from "../components/profiles/ProfileStaffTab";
 import ProfileSolverTab from "../components/profiles/ProfileSolverTab";
@@ -89,6 +90,7 @@ function ProfileCard({
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const askConfirm = useConfirm();
   const del = useMutation({
     mutationFn: () => deleteProfile(profile.id),
     onSuccess: () => {
@@ -175,7 +177,14 @@ function ProfileCard({
           <button className="btn btn-sm btn-primary" onClick={onDuplicate}>Duplicate</button>
           <button
             className="btn btn-sm btn-danger"
-            onClick={() => confirm(`Delete profile ${profile.name}?`) && del.mutate()}
+            onClick={async () => {
+              const ok = await askConfirm({
+                title: `Delete profile ${profile.name}?`,
+                confirmLabel: "Delete",
+                danger: true,
+              });
+              if (ok) del.mutate();
+            }}
             disabled={del.isPending}
           >
             Delete
