@@ -7,6 +7,11 @@ output "ecr_repository_urls" {
   value       = { for k, r in aws_ecr_repository.app : k => r.repository_url }
 }
 
+output "vpc_id" {
+  description = "Handy for finding everything in the console: VPC -> Your VPCs -> Resource map."
+  value       = aws_vpc.main.id
+}
+
 output "region" {
   description = "Region every resource lives in; read by scripts/aws-deploy.sh."
   value       = var.region
