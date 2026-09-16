@@ -125,6 +125,21 @@ docker compose -f docker-compose.dev.yml down
 docker compose -f docker-compose.dev.yml down -v
 ```
 
+## Deployment
+
+Two targets, each with its own guide:
+
+- **Kubernetes / HPE PCAI** via the Helm chart in `charts/roster-engine` — see [DEPLOY.md](DEPLOY.md).
+- **AWS (ECS Fargate)** via Terraform in `infra/aws` — see [DEPLOY-AWS.md](DEPLOY-AWS.md).
+
+For AWS, day to day:
+
+```bash
+scripts/aws-up.sh        # create or update the whole stack (asks for "yes")
+scripts/aws-down.sh      # delete everything except ECR images; stops hourly billing
+scripts/aws-deploy.sh    # build both images, tag with git SHA, push to ECR
+```
+
 ## Authentication
  
 All `/api/*` endpoints except `POST /api/auth/login` require a valid JWT bearer token.
