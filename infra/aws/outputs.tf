@@ -1,0 +1,13 @@
+# Values printed after `terraform apply` and readable any time with
+# `terraform output`. These are the handles other tooling (the deploy script,
+# the ECS task definitions) needs.
+
+output "ecr_repository_urls" {
+  description = "Full registry path per image, e.g. 1234.dkr.ecr.ap-southeast-1.amazonaws.com/roster-backend"
+  value       = { for k, r in aws_ecr_repository.app : k => r.repository_url }
+}
+
+output "region" {
+  description = "Region every resource lives in; read by scripts/aws-deploy.sh."
+  value       = var.region
+}
