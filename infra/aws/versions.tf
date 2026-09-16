@@ -9,5 +9,11 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+    # Generates passwords inside Terraform so they never pass through a
+    # keyboard or a file someone typed. Stored in state (gitignored).
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 }

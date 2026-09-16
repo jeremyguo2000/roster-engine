@@ -12,6 +12,16 @@ output "vpc_id" {
   value       = aws_vpc.main.id
 }
 
+output "rds_endpoint" {
+  description = "Postgres hostname. Reachable only from inside the VPC."
+  value       = aws_db_instance.main.address
+}
+
+output "redis_endpoint" {
+  description = "Redis hostname. Reachable only from inside the VPC."
+  value       = aws_elasticache_cluster.main.cache_nodes[0].address
+}
+
 output "region" {
   description = "Region every resource lives in; read by scripts/aws-deploy.sh."
   value       = var.region
