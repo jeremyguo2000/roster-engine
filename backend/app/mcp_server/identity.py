@@ -6,8 +6,10 @@ from .token_manager import ServiceTokenManager
 async def resolve_token(token_manager: ServiceTokenManager, ctx: Any = None) -> str:
     """Decide which bearer token to use for a tool's backend calls.
 
-    Today: always the shared service-account token, so the agent never supplies a
-    credential. `ctx` is accepted but unused.
+    Today: always the shared service-account token. The caller has already proved
+    it holds MCP_ACCESS_TOKEN (auth.py), but that token identifies a deployment's
+    clients as a group, not a person, so it is never forwarded to the backend.
+    `ctx` is accepted but unused.
 
     Multi-user seam (future): plumb the inbound request `ctx` through to here, read a
     trusted end-user id off it, and return that user's per-user token instead, e.g.

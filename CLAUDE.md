@@ -52,7 +52,7 @@ docker compose -f docker-compose.dev.yml exec postgres psql -U roster -d roster_
 
 ## Architecture
 
-Three components: a React frontend (`frontend/`), the backend (`backend/`), and an MCP server (`backend/app/mcp_server/`, its own container) that exposes roster operations as MCP tools over Streamable HTTP at port 8001, authenticating with the `mcp_service` account (credentials in `.env`; see `MCP-guide.md`). An operator-facing manual lives at `documentation/operators-manual.html`.
+Three components: a React frontend (`frontend/`), the backend (`backend/`), and an MCP server (`backend/app/mcp_server/`, its own container) that exposes roster operations as MCP tools over Streamable HTTP at port 8001, authenticating to the backend with the `svc-mcp` service account and requiring clients to send `MCP_ACCESS_TOKEN` as a bearer header (both in `.env`; see `MCP-guide.md`). An operator-facing manual lives at `documentation/operators-manual.html`.
 
 The frontend (React 18 + Vite + TypeScript, react-query, react-router) talks to the API via the Vite dev proxy (`VITE_PROXY_TARGET`). Pages live in `frontend/src/pages/`, one per nav item.
 
