@@ -2,16 +2,27 @@
 
 Run against a fresh database, from the host: python3 scripts/seed_demo_ward.py
 Requires: pip install requests. Assumes admin/admin123 exists (see README).
+
+Point it elsewhere with environment variables, e.g. the AWS deployment:
+  ROSTER_API_URL=http://<alb-dns-name>/api ROSTER_ADMIN_PASSWORD=... python3 scripts/seed_demo_ward.py
 Shift work_min is a uniform 440-min credit — exact-hours targets need uniform
 credits to stay feasible (see documentation/operators-manual.html, gotcha 1).
 """
+import os
 import sys
 from datetime import date, timedelta
 
 import requests
 
-API = "http://localhost:8000/api"
-tok = requests.post(f"{API}/auth/login", json={"username": "admin", "password": "admin123"}).json()["access_token"]
+API = os.environ.get("ROSTER_API_URL", "http://localhost:8000/api").rstrip("/")
+ADMIN_USER = os.environ.get("ROSTER_ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("ROSTER_ADMIN_PASSWORD", "admin123")
+
+login = requests.post(f"{API}/auth/login", json={"username": ADMIN_USER, "password": ADMIN_PASSWORD})
+if login.status_code != 200:
+    print(f"login as {ADMIN_USER} at {API} failed: {login.status_code} {login.text[:200]}", file=sys.stderr)
+    sys.exit(1)
+tok = login.json()["access_token"]
 s = requests.Session()
 s.headers["Authorization"] = f"Bearer {tok}"
 
