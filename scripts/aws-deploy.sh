@@ -5,8 +5,8 @@
 #   scripts/aws-deploy.sh            # build + push
 #
 # The tag is the short git SHA so every push is a new, immutable tag (the ECR
-# repositories reject overwrites). Phase 7 extends this script to roll the ECS
-# services onto the new tag via `terraform apply -var image_tag=...`.
+# repositories reject overwrites). The tag is recorded in
+# infra/aws/image.auto.tfvars; scripts/aws-up.sh then rolls the ECS services.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
@@ -44,5 +44,13 @@ echo "==> pushing"
 docker push "$REGISTRY/roster-backend:$TAG"
 docker push "$REGISTRY/roster-frontend:$TAG"
 
+# Record the tag for Terraform. image.auto.tfvars is loaded automatically by
+# every terraform command in infra/aws and is gitignored (*.tfvars).
+cat > infra/aws/image.auto.tfvars <<EOT
+# Written by scripts/aws-deploy.sh after each push. Gitignored (*.tfvars).
+image_tag = "$TAG"
+EOT
+
 echo
 echo "pushed tag: $TAG"
+echo "next: scripts/aws-up.sh   # rolls the ECS services onto this tag"

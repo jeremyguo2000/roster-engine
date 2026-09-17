@@ -151,3 +151,54 @@ Verify (the value contains the real RDS hostname and password):
 aws ssm get-parameter --name /roster/DATABASE_URL --with-decryption \
   --query Parameter.Value --output text
 ```
+
+## Phase 5 — ECS
+
+The application: one cluster, four task definitions and four services
+(backend, worker, mcp, frontend), an Application Load Balancer in front of the
+frontend, a CloudWatch log group per service, and the task role that lets ECS
+Exec open a shell in the backend. Tasks find each other by name through ECS
+Service Connect (`backend:8000`, `mcp:8000`), so the images run unchanged.
+
+Cost while up: about $0.10/hour for the tasks plus $0.025/hour for the ALB, on
+top of phase 3.
+
+The image tag comes from `infra/aws/image.auto.tfvars`, which
+`scripts/aws-deploy.sh` writes after each push. If it is missing, apply stops
+with a message saying so.
+
+```bash
+scripts/aws-up.sh            # expect 19 to add on top of phases 2-4
+terraform -chdir=infra/aws output app_url
+```
+
+Wait for all four services to show 1/1 running:
+
+```bash
+aws ecs describe-services --cluster roster --services backend worker mcp frontend \
+  --query 'services[].{name:serviceName,running:runningCount,desired:desiredCount}' --output table
+```
+
+The backend task may restart once or twice while RDS finishes accepting
+connections. If it keeps going, read its log group:
+
+```bash
+aws logs tail /ecs/roster/backend --since 10m          # AWS CLI v2
+aws logs filter-log-events --log-group-name /ecs/roster/backend \
+  --query 'events[].message' --output text             # CLI v1
+```
+
+### Bootstrap the users
+
+The API has no default login. Create the admin user and the MCP service
+account inside the backend task (needs `session-manager-plugin` installed):
+
+```bash
+scripts/aws-bootstrap-users.sh '<admin password>'
+```
+
+Then open the `app_url`, log in as `admin`, and generate a roster: a solved
+roster proves the worker, Redis and Postgres are all wired.
+
+The database is deleted by `aws-down.sh`, so run the bootstrap again after
+each `aws-up.sh`.

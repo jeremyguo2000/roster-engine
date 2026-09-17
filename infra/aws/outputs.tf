@@ -16,3 +16,12 @@ output "redis_endpoint" {
   description = "Redis hostname. Reachable only from inside the VPC."
   value       = aws_elasticache_cluster.main.cache_nodes[0].address
 }
+
+output "app_url" {
+  description = "Where the app is. Plain HTTP until phase 6."
+  value       = "http://${aws_lb.main.dns_name}"
+}
+
+output "cluster_name" {
+  value = aws_ecs_cluster.main.name
+}
