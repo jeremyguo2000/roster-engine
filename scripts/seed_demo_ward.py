@@ -26,6 +26,12 @@ tok = login.json()["access_token"]
 s = requests.Session()
 s.headers["Authorization"] = f"Bearer {tok}"
 
+# Safe to run on every deploy: the catalogue is only loaded into an empty
+# database. Any existing profile means it (or real data) is already there.
+if s.get(f"{API}/profiles").json():
+    print("profiles already exist; not seeding")
+    sys.exit(0)
+
 def post(path, body):
     r = s.post(f"{API}{path}", json=body)
     if r.status_code not in (200, 201):

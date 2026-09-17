@@ -27,6 +27,16 @@ resource "random_password" "mcp_service" {
   special = false
 }
 
+# First web-UI login. Same idea as the chart's auth.initialAdmin: generated
+# here, stored in SSM, and scripts/aws-up.sh creates the user with it after
+# every apply (the database is empty after each aws-down.sh). Read it back:
+#   aws ssm get-parameter --name /roster/ADMIN_PASSWORD --with-decryption \
+#     --query Parameter.Value --output text
+resource "random_password" "admin" {
+  length  = 20
+  special = false
+}
+
 # ---------------------------------------------------------------------------
 # Optional: Claude API key for the in-app chat assistant. Left empty, no
 # parameter is created and phase 5 leaves chat disabled (the UI hides it).
@@ -61,6 +71,7 @@ locals {
     CELERY_BROKER_URL       = local.redis_url
     SECRET_KEY              = random_password.secret_key.result
     ROSTER_SERVICE_PASSWORD = random_password.mcp_service.result
+    ADMIN_PASSWORD          = random_password.admin.result
   }
 }
 
@@ -75,6 +86,7 @@ resource "aws_ssm_parameter" "app" {
     "CELERY_BROKER_URL",
     "SECRET_KEY",
     "ROSTER_SERVICE_PASSWORD",
+    "ADMIN_PASSWORD",
   ])
 
   name  = "/${var.name}/${each.key}"

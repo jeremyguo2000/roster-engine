@@ -135,9 +135,9 @@ Two targets, each with its own guide:
 For AWS, day to day:
 
 ```bash
-scripts/aws-up.sh        # create or update the whole stack (asks for "yes")
-scripts/aws-down.sh      # delete everything except ECR images; stops hourly billing
 scripts/aws-deploy.sh    # build both images, tag with git SHA, push to ECR
+scripts/aws-up.sh        # create or update the stack, create logins, load demo data
+scripts/aws-down.sh      # delete everything except ECR images; stops hourly billing
 ```
 
 ## Authentication
