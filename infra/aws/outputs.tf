@@ -25,3 +25,8 @@ output "app_url" {
 output "cluster_name" {
   value = aws_ecs_cluster.main.name
 }
+
+output "mcp_exposed" {
+  description = "Whether /mcp is reachable through the ALB (var.expose_mcp)."
+  value       = var.expose_mcp
+}

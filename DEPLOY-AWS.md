@@ -130,6 +130,7 @@ role** that is allowed to read exactly those parameters. No hourly cost.
 | `/roster/CELERY_BROKER_URL`       | same                                     |
 | `/roster/SECRET_KEY`              | generated (`random_password`)            |
 | `/roster/ROSTER_SERVICE_PASSWORD` | generated; the svc-mcp user is created with it in phase 5 |
+| `/roster/MCP_ACCESS_TOKEN`        | generated; MCP clients send it as `Authorization: Bearer ...` |
 | `/roster/ANTHROPIC_API_KEY`       | only if `-var anthropic_api_key=...` is passed |
 
 The IAM identity running Terraform needs SSM permissions. An IAM user can
@@ -205,6 +206,15 @@ Both steps are no-ops when already done, so every `aws-up.sh` is safe.
   ```
 - `svc-mcp` — the MCP server's service account, password from
   `/roster/ROSTER_SERVICE_PASSWORD`.
+
+The MCP endpoint is **blocked at the ALB by default** (a listener rule answers
+403 for `/mcp`), because nothing outside AWS needs it yet. To open it, set
+`expose_mcp = true` in a gitignored `.tfvars` file and re-run `aws-up.sh`.
+MCP clients then connect to `<app_url>/mcp` and must send the header
+`Authorization: Bearer <token>`, with the token from `/roster/MCP_ACCESS_TOKEN`
+(`aws-up.sh` prints it; MCP-guide.md has the per-client syntax). The ALB is
+public, so that header is what keeps the MCP server from being an open door to
+the `svc-mcp` account.
 
 Skip the demo data with `ROSTER_SEED_DEMO=0 scripts/aws-up.sh`. The steps can
 also be run on their own: `scripts/aws-bootstrap-users.sh`, and

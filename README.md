@@ -14,6 +14,7 @@ for end-user instructions.
 cp .env.example .env
 # Edit .env — set a strong POSTGRES_PASSWORD
 # Also set SECRET_KEY (generate with: openssl rand -hex 32)
+# And MCP_ACCESS_TOKEN (same command) — what MCP clients send as a bearer header
 ```
 
 ### 2. Build the images with your user IDs

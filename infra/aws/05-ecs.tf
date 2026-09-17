@@ -220,6 +220,7 @@ resource "aws_ecs_task_definition" "mcp" {
       ]
       secrets = [
         { name = "ROSTER_SERVICE_PASSWORD", valueFrom = aws_ssm_parameter.app["ROSTER_SERVICE_PASSWORD"].arn },
+        { name = "MCP_ACCESS_TOKEN", valueFrom = aws_ssm_parameter.app["MCP_ACCESS_TOKEN"].arn },
       ]
       logConfiguration = local.log_config["mcp"]
     },
@@ -306,6 +307,34 @@ resource "aws_lb_listener" "http" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.frontend.arn
+  }
+}
+
+# The MCP server acts as the svc-mcp service account for every caller, gated
+# only by the shared MCP_ACCESS_TOKEN bearer header (see MCP-guide.md). nginx
+# proxies /mcp, so on this deployment the ALB would put that endpoint on the
+# public internet. Off by default: this rule answers 403 for /mcp before the
+# listener's default forward (lower priority number wins). Set expose_mcp =
+# true when an external MCP client actually needs it.
+resource "aws_lb_listener_rule" "block_mcp" {
+  count = var.expose_mcp ? 0 : 1
+
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 10
+
+  action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "The MCP endpoint is not exposed on this deployment."
+      status_code  = "403"
+    }
+  }
+
+  condition {
+    path_pattern {
+      values = ["/mcp", "/mcp/*"]
+    }
   }
 }
 

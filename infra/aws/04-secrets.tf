@@ -27,6 +27,15 @@ resource "random_password" "mcp_service" {
   special = false
 }
 
+# Bearer token MCP clients present to the MCP server as
+# `Authorization: Bearer ...`. The ALB is public and the server acts as
+# svc-mcp, so this is the only thing between the internet and that account.
+# Read it back like ADMIN_PASSWORD, from /roster/MCP_ACCESS_TOKEN.
+resource "random_password" "mcp_access_token" {
+  length  = 48
+  special = false
+}
+
 # First web-UI login. Same idea as the chart's auth.initialAdmin: stored in
 # SSM, and scripts/aws-up.sh creates the user with it after every apply (the
 # database is empty after each aws-down.sh). Generated unless admin_password
@@ -88,6 +97,7 @@ locals {
     CELERY_BROKER_URL       = local.redis_url
     SECRET_KEY              = random_password.secret_key.result
     ROSTER_SERVICE_PASSWORD = random_password.mcp_service.result
+    MCP_ACCESS_TOKEN        = random_password.mcp_access_token.result
     ADMIN_PASSWORD          = var.admin_password != "" ? var.admin_password : random_password.admin.result
   }
 }
@@ -103,6 +113,7 @@ resource "aws_ssm_parameter" "app" {
     "CELERY_BROKER_URL",
     "SECRET_KEY",
     "ROSTER_SERVICE_PASSWORD",
+    "MCP_ACCESS_TOKEN",
     "ADMIN_PASSWORD",
   ])
 

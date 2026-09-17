@@ -1,7 +1,8 @@
 # Default values for roster-engine.
 #
-# Three values are REQUIRED and have no defaults (install fails with a clear
-# error if unset): auth.secretKey, postgres.password, mcp.servicePassword.
+# Four values are REQUIRED and have no defaults (install fails with a clear
+# error if unset): auth.secretKey, postgres.password, mcp.servicePassword,
+# mcp.accessToken.
 
 image:
   # Registry prefix for the two app images, e.g. "harbor.example.com/roster".
@@ -60,6 +61,10 @@ mcp:
   # after install (see DEPLOY.md) with exactly these credentials.
   serviceUsername: svc-mcp
   servicePassword: ""
+  # Bearer token every MCP client must send (`Authorization: Bearer <token>`).
+  # The server acts as the service account above, so this is what stands
+  # between "can reach /mcp" and "can create rosters". openssl rand -hex 32
+  accessToken: ""
   resources: {}
 
 # In-app scheduling assistant (the chat widget). Optional: when disabled, or when

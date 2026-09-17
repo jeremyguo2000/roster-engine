@@ -35,3 +35,9 @@ variable "cpu_architecture" {
     error_message = "cpu_architecture must be X86_64 or ARM64."
   }
 }
+
+variable "expose_mcp" {
+  description = "Let the internet reach /mcp (bearer-token protected). Off by default; the ALB answers 403."
+  type        = bool
+  default     = false
+}

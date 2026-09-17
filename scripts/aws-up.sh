@@ -35,6 +35,8 @@ curl -fsS -o /dev/null "$APP_URL/api/health"
 
 ADMIN_PASSWORD=$(aws ssm get-parameter --name /roster/ADMIN_PASSWORD \
   --with-decryption --query Parameter.Value --output text)
+MCP_ACCESS_TOKEN=$(aws ssm get-parameter --name /roster/MCP_ACCESS_TOKEN \
+  --with-decryption --query Parameter.Value --output text)
 
 if [ "${ROSTER_SEED_DEMO:-1}" != "0" ]; then
   echo "==> demo data"
@@ -46,3 +48,9 @@ echo
 echo "app:            $APP_URL"
 echo "login:          admin"
 echo "admin password: $ADMIN_PASSWORD"
+if [ "$(terraform output -raw mcp_exposed)" = "true" ]; then
+  echo "mcp:            $APP_URL/mcp"
+  echo "mcp header:     Authorization: Bearer $MCP_ACCESS_TOKEN"
+else
+  echo "mcp:            blocked at the ALB (set expose_mcp = true in a .tfvars file to open it)"
+fi
