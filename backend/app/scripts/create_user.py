@@ -4,7 +4,10 @@ since POST /api/auth/users requires an existing user to be logged in.
 
 Usage:
     docker compose -f docker-compose.dev.yml exec backend \\
-        python -m app.scripts.create_user <username> <password>
+        python -m app.scripts.create_user <username> <password> [--update]
+
+With --update an existing user gets the given password instead of an error,
+so deployment bootstraps can run it on every start.
 """
 import sys
 
@@ -14,11 +17,14 @@ from app.models import User
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python -m app.scripts.create_user <username> <password>")
+    args = sys.argv[1:]
+    update = "--update" in args
+    args = [a for a in args if a != "--update"]
+    if len(args) != 2:
+        print("Usage: python -m app.scripts.create_user <username> <password> [--update]")
         sys.exit(1)
 
-    username, password = sys.argv[1], sys.argv[2]
+    username, password = args
 
     if len(username) < 3:
         print("Error: username must be at least 3 characters.")
@@ -31,8 +37,13 @@ def main():
     try:
         existing = db.query(User).filter_by(username=username).first()
         if existing:
-            print(f"Error: user '{username}' already exists.")
-            sys.exit(1)
+            if not update:
+                print(f"Error: user '{username}' already exists.")
+                sys.exit(1)
+            existing.password_hash = hash_password(password)
+            db.commit()
+            print(f"✅ Updated password for user '{username}' (id={existing.id})")
+            return
 
         user = User(
             username=username,
