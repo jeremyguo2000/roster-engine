@@ -1,8 +1,15 @@
 # Deploying roster-engine on AWS (ECS Fargate)
 
 Companion to `DEPLOY.md` (Helm / PCAI). Everything AWS-side is Terraform under
-`infra/aws/`, one file per phase; `scripts/aws-deploy.sh` builds and pushes
-images. The full plan with reasoning lives in the "Roster Engine on AWS" page.
+`infra/aws/`, in two root modules with separate state:
+
+- `infra/aws/registry/` — the ECR repositories. Long-lived; images survive
+  a teardown of the stack.
+- `infra/aws/` — the stack, one file per phase. Created and destroyed between
+  sessions.
+
+`scripts/aws-deploy.sh` builds and pushes images. The full plan with
+reasoning lives in the "Roster Engine on AWS" page.
 
 Prerequisites on the machine running this: `aws` CLI logged in to the target
 account with a default region, `terraform` >= 1.5, `docker`.
@@ -22,14 +29,16 @@ so run `aws-down.sh` at the end of a session. The phases below explain what
 
 Creates two private ECR repositories (`roster-backend`, `roster-frontend`) with
 immutable tags and a lifecycle policy that keeps the 10 most recent images.
+This is its own Terraform root (`infra/aws/registry/`) precisely so that
+`aws-down.sh`, which destroys the stack, never deletes the images.
 
 ```bash
-cd infra/aws
+cd infra/aws/registry
 terraform init
 terraform plan      # expect: 4 to add (2 repositories + 2 lifecycle policies)
 terraform apply
 
-cd ../..
+cd ../../..
 scripts/aws-deploy.sh   # build both images, tag with git SHA, push
 ```
 
@@ -106,3 +115,39 @@ backend's migrations succeeding in phase 5.
 
 Learning-deployment settings to flip once real data exists:
 `skip_final_snapshot = false`, `deletion_protection = true`.
+
+## Phase 4 — secrets
+
+Writes every value the app reads from the environment into SSM Parameter
+Store as SecureStrings under `/roster/`, and creates the ECS **task execution
+role** that is allowed to read exactly those parameters. No hourly cost.
+
+| Parameter                         | Source                                   |
+|-----------------------------------|------------------------------------------|
+| `/roster/DATABASE_URL`            | built from the RDS endpoint + generated password |
+| `/roster/CELERY_RESULT_BACKEND`   | same, with the `db+` prefix              |
+| `/roster/REDIS_URL`               | built from the ElastiCache endpoint      |
+| `/roster/CELERY_BROKER_URL`       | same                                     |
+| `/roster/SECRET_KEY`              | generated (`random_password`)            |
+| `/roster/ROSTER_SERVICE_PASSWORD` | generated; the svc-mcp user is created with it in phase 5 |
+| `/roster/ANTHROPIC_API_KEY`       | only if `-var anthropic_api_key=...` is passed |
+
+The IAM identity running Terraform needs SSM permissions. An IAM user can
+carry at most 10 attached managed policies, so if that quota is hit, grant it
+inline instead:
+
+```bash
+aws iam put-user-policy --user-name <user> --policy-name ssm-parameters \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"ssm:*","Resource":"*"}]}'
+```
+
+```bash
+scripts/aws-up.sh     # phases 2-4 together if the stack is down
+```
+
+Verify (the value contains the real RDS hostname and password):
+
+```bash
+aws ssm get-parameter --name /roster/DATABASE_URL --with-decryption \
+  --query Parameter.Value --output text
+```

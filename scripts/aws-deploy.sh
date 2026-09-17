@@ -11,7 +11,10 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-REGION=$(terraform -chdir=infra/aws output -raw region 2>/dev/null || echo ap-southeast-1)
+# Region comes from the CLI config (or AWS_REGION), not from Terraform state:
+# the stack may be torn down, and the registry must be reachable regardless.
+REGION=${AWS_REGION:-$(aws configure get region 2>/dev/null || true)}
+REGION=${REGION:-ap-southeast-1}
 TAG=$(git rev-parse --short HEAD)
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REGISTRY="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"

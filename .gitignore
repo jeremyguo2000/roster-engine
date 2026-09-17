@@ -51,9 +51,10 @@ roster.yaml
 *-values.yaml
 values-*.yaml
 
-# Terraform (infra/aws). State files hold real secrets (DB password, JWT key)
+# Terraform (infra/aws and infra/aws/registry). State files hold real secrets (DB password, JWT key)
 # and .terraform/ is the downloaded provider cache. The .terraform.lock.hcl
 # file IS committed: it pins provider checksums, like package-lock.json.
+infra/aws/**/.terraform/
 infra/aws/.terraform/
 *.tfstate
 *.tfstate.*

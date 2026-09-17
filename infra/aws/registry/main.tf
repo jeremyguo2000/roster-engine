@@ -1,5 +1,8 @@
 # Phase 1 — container registry.
 #
+# Applied separately from the stack (see versions.tf) so scripts/aws-down.sh
+# never deletes the images. `terraform destroy` HERE does delete them.
+#
 # One private ECR repository per image. The backend image is shared by the
 # API, the celery worker and the MCP server (they differ only by command), so
 # there are two repositories, not four.
@@ -23,9 +26,10 @@ resource "aws_ecr_repository" "app" {
     scan_on_push = true
   }
 
-  # Lets `terraform destroy` remove a repository that still holds images.
-  # Without this, destroy fails until you empty the repository by hand.
-  # Acceptable for a deployment you expect to tear down and rebuild.
+  # Lets a deliberate `terraform destroy` of this module remove a repository
+  # that still holds images, instead of failing until it is emptied by hand.
+  # Safe only because this module has its own state and the day-to-day
+  # aws-down.sh never touches it.
   force_delete = true
 }
 
