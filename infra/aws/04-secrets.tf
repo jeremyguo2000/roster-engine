@@ -27,14 +27,31 @@ resource "random_password" "mcp_service" {
   special = false
 }
 
-# First web-UI login. Same idea as the chart's auth.initialAdmin: generated
-# here, stored in SSM, and scripts/aws-up.sh creates the user with it after
-# every apply (the database is empty after each aws-down.sh). Read it back:
+# First web-UI login. Same idea as the chart's auth.initialAdmin: stored in
+# SSM, and scripts/aws-up.sh creates the user with it after every apply (the
+# database is empty after each aws-down.sh). Generated unless admin_password
+# is set. Read it back:
 #   aws ssm get-parameter --name /roster/ADMIN_PASSWORD --with-decryption \
 #     --query Parameter.Value --output text
 resource "random_password" "admin" {
   length  = 20
   special = false
+}
+
+# Set this for a memorable password on a throwaway deployment, in a gitignored
+# *.tfvars file. Leave empty for a generated one. Anything on the public ALB
+# with a guessable admin password is open to whoever finds the URL, so don't
+# do this on a stack that holds real staff data.
+variable "admin_password" {
+  description = "Admin login password. Empty means generated. Min 6 chars (create_user enforces it)."
+  type        = string
+  default     = ""
+  sensitive   = true
+
+  validation {
+    condition     = var.admin_password == "" || length(var.admin_password) >= 6
+    error_message = "admin_password must be empty (generated) or at least 6 characters."
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -71,7 +88,7 @@ locals {
     CELERY_BROKER_URL       = local.redis_url
     SECRET_KEY              = random_password.secret_key.result
     ROSTER_SERVICE_PASSWORD = random_password.mcp_service.result
-    ADMIN_PASSWORD          = random_password.admin.result
+    ADMIN_PASSWORD          = var.admin_password != "" ? var.admin_password : random_password.admin.result
   }
 }
 
