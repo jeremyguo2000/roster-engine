@@ -1,0 +1,46 @@
+# Overrides for running roster-engine on a host that already runs AgentOps
+# (and BidManager): the default host ports 5432/6379/8000/8001/5173 are all taken
+# there, and AgentOps agents need to reach the MCP server over the compose
+# network rather than via localhost.
+#
+# Use together with the dev file:
+#   docker compose -f docker-compose.dev.yml -f docker-compose.shared-host.yml up -d
+#
+# What this changes:
+#   - host ports moved to 15432 / 16379 / 18000 / 18001 / 15173
+#   - backend and mcp also join the external `agentops_agentops` network, with
+#     the aliases `roster-backend` and `roster-mcp`, so an AgentOps tool can use
+#     url http://roster-mcp:8000/mcp
+services:
+  postgres:
+    ports: !override
+      - "15432:5432"
+
+  redis:
+    ports: !override
+      - "16379:6379"
+
+  backend:
+    ports: !override
+      - "18000:8000"
+    networks:
+      default: {}
+      agentops:
+        aliases: [roster-backend]
+
+  frontend:
+    ports: !override
+      - "15173:5173"
+
+  mcp:
+    ports: !override
+      - "18001:8000"
+    networks:
+      default: {}
+      agentops:
+        aliases: [roster-mcp]
+
+networks:
+  agentops:
+    external: true
+    name: agentops_agentops
