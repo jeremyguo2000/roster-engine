@@ -95,7 +95,18 @@ export default function ChatAssistant() {
   return (
     <div className="chat-panel">
       <div className="chat-head">
-        <span style={{ fontWeight: 600 }}>Scheduling assistant</span>
+        <span style={{ fontWeight: 600 }}>
+          Scheduling assistant
+          {statusQ.data?.label && (
+            <span
+              className="muted"
+              title={`chat_provider = ${statusQ.data.provider}`}
+              style={{ fontWeight: 400, fontSize: "0.8em", marginLeft: "var(--s-2)" }}
+            >
+              {statusQ.data.label}
+            </span>
+          )}
+        </span>
         <div className="row" style={{ gap: "var(--s-2)" }}>
           {messages.length > 0 && (
             <button className="chat-reset" onClick={reset}>
