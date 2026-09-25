@@ -10,6 +10,7 @@ import logging
 from app.config import settings
 from app.tooling.client import RosterApiClient, static_token
 
+from .agentops import AgentOpsClient, AgentOpsError
 from .providers import (
     AnthropicProvider,
     OpenAICompatibleProvider,
@@ -110,7 +111,41 @@ def is_configured() -> bool:
         return bool(settings.anthropic_api_key)
     if settings.chat_provider == "openai":
         return bool(settings.chat_base_url)
+    if settings.chat_provider == "agentops":
+        return all((settings.agentops_base_url, settings.agentops_client_id,
+                    settings.agentops_client_secret, settings.agentops_agent_id))
     return False
+
+
+def provider_label() -> str:
+    """Short human label for the UI: which path answers, and roughly with what."""
+    p = settings.chat_provider
+    if p == "agentops":
+        return "via AgentOps"
+    if p == "anthropic":
+        return f"direct · {settings.chat_model or DEFAULT_ANTHROPIC_MODEL}"
+    if p == "openai":
+        return f"direct · {settings.chat_model or 'openai-compatible'}"
+    return p
+
+
+def build_agentops_client() -> AgentOpsClient:
+    missing = [n for n in ("agentops_base_url", "agentops_client_id",
+                           "agentops_client_secret", "agentops_agent_id")
+               if not getattr(settings, n)]
+    if missing:
+        raise ChatUnavailable(
+            "The chat assistant is not configured: chat_provider is 'agentops' but "
+            + ", ".join(m.upper() for m in missing) + " unset."
+        )
+    return AgentOpsClient(
+        base_url=settings.agentops_base_url,
+        client_id=settings.agentops_client_id,
+        client_secret=settings.agentops_client_secret,
+        agent_id=settings.agentops_agent_id,
+        model=settings.agentops_model,
+        timeout_seconds=settings.agentops_timeout_seconds,
+    )
 
 
 def build_provider() -> Provider:
@@ -149,9 +184,39 @@ def build_provider() -> Provider:
             api_key=settings.chat_api_key,
         )
 
+    if provider == "agentops":
+        raise ChatUnavailable(
+            "chat_provider 'agentops' does not run the local tool loop; use answer()."
+        )
+
     raise ChatUnavailable(
-        f"Unknown chat_provider {provider!r} — expected 'anthropic' or 'openai'."
+        f"Unknown chat_provider {provider!r} — expected 'anthropic', 'openai' or 'agentops'."
     )
+
+
+class ChatResult:
+    """What the router returns: the reply plus where it came from."""
+
+    def __init__(self, reply: str, provider: str, run_id: str | None = None) -> None:
+        self.reply, self.provider, self.run_id = reply, provider, run_id
+
+
+async def answer(messages: list[dict], token: str) -> ChatResult:
+    """Provider-agnostic entry point for the router.
+
+    agentops: one call to the platform; no local loop, no provider key.
+    anthropic / openai: the local tool-calling loop below, unchanged.
+    """
+    if settings.chat_provider == "agentops":
+        client = build_agentops_client()
+        try:
+            reply, run_id = await client.chat(messages)
+        except AgentOpsError as e:
+            raise ChatUnavailable(str(e)) from e
+        finally:
+            await client.aclose()
+        return ChatResult(reply, "agentops", run_id)
+    return ChatResult(await chat(messages, token), settings.chat_provider)
 
 
 async def chat(messages: list[dict], token: str) -> str:

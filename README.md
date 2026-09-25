@@ -125,6 +125,29 @@ docker compose -f docker-compose.dev.yml down
 docker compose -f docker-compose.dev.yml down -v
 ```
 
+## Chat assistant: direct or via AgentOps
+
+The in-app assistant has three interchangeable back ends, chosen by
+`CHAT_PROVIDER` in `.env`:
+
+| Value | What answers | Needs |
+|---|---|---|
+| `anthropic` (default) | Claude, called directly from this backend, local tool loop | `ROSTER_ANTHROPIC_API_KEY` |
+| `openai` | any OpenAI-compatible endpoint (vLLM, NIM, Ollama), local tool loop | `CHAT_BASE_URL`, `CHAT_MODEL` |
+| `agentops` | the **AgentOps** platform: it picks the model, runs the roster tools through this app's MCP server, applies guardrails and records audit, trace and cost | `AGENTOPS_BASE_URL`, `AGENTOPS_CLIENT_ID`, `AGENTOPS_CLIENT_SECRET`, `AGENTOPS_AGENT_ID` |
+
+Switch without touching anything else (only the backend container is recreated):
+
+```bash
+scripts/chat-provider.sh agentops    # governed path
+scripts/chat-provider.sh anthropic   # direct path
+```
+
+The chat panel shows which path is active ("via AgentOps" or "direct · <model>"),
+and in AgentOps mode each reply carries the platform `run_id` so it can be found in
+Runs & Traces. A request blocked by an AgentOps guardrail is shown to the user as
+"blocked by policy" rather than as an error.
+
 ## Authentication
  
 All `/api/*` endpoints except `POST /api/auth/login` require a valid JWT bearer token.
