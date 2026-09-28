@@ -46,6 +46,18 @@ services:
       # ANTHROPIC_API_KEY for other tooling would silently shadow this file. The
       # namespaced name can't collide; the container still sees ANTHROPIC_API_KEY.
       - ANTHROPIC_API_KEY=${ROSTER_ANTHROPIC_API_KEY}
+      # Which path serves the chat assistant: anthropic | openai | agentops.
+      # Toggle with scripts/chat-provider.sh; only the backend is recreated.
+      - CHAT_PROVIDER=${CHAT_PROVIDER:-anthropic}
+      - CHAT_MODEL=${CHAT_MODEL:-}
+      - CHAT_BASE_URL=${CHAT_BASE_URL:-}
+      - CHAT_API_KEY=${CHAT_API_KEY:-}
+      # chat_provider=agentops: the app holds an Application Key, not a model key.
+      - AGENTOPS_BASE_URL=${AGENTOPS_BASE_URL:-}
+      - AGENTOPS_CLIENT_ID=${AGENTOPS_CLIENT_ID:-}
+      - AGENTOPS_CLIENT_SECRET=${AGENTOPS_CLIENT_SECRET:-}
+      - AGENTOPS_AGENT_ID=${AGENTOPS_AGENT_ID:-}
+      - AGENTOPS_MODEL=${AGENTOPS_MODEL:-}
     depends_on:
       postgres:
         condition: service_healthy

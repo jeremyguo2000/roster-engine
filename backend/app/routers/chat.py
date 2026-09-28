@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.chat.service import ChatUnavailable, chat as run_chat, is_configured
+from app.chat.service import ChatUnavailable, answer, is_configured, provider_label
 from app.config import settings
 from app.dependencies.auth import get_current_user, oauth2_scheme
 from app.models import User
@@ -27,6 +27,8 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    provider: str            # which path answered: anthropic | openai | agentops
+    run_id: str | None = None  # AgentOps run id when provider == "agentops"
 
 
 @router.post("", response_model=ChatResponse)
@@ -42,7 +44,7 @@ async def send_message(
     service account.
     """
     try:
-        reply = await run_chat([m.model_dump() for m in body.messages], token)
+        result = await answer([m.model_dump() for m in body.messages], token)
     except ChatUnavailable as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e)) from e
     except Exception:
@@ -51,7 +53,7 @@ async def send_message(
             status.HTTP_502_BAD_GATEWAY,
             "The assistant failed to respond. Please try again.",
         )
-    return ChatResponse(reply=reply)
+    return ChatResponse(reply=result.reply, provider=result.provider, run_id=result.run_id)
 
 
 @router.get("/status")
@@ -59,4 +61,4 @@ def chat_status(current_user: User = Depends(get_current_user)):
     """Whether the assistant is configured — lets the UI hide the widget instead of
     showing one that 503s on first use. `provider` is reported for support: which
     model answered is the first question when replies look wrong."""
-    return {"enabled": is_configured(), "provider": settings.chat_provider}
+    return {"enabled": is_configured(), "provider": settings.chat_provider, "label": provider_label()}
