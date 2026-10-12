@@ -9,19 +9,23 @@
 # What this changes:
 #   - host ports moved to 15432 / 16379 / 18000 / 18001 / 15173; all but the
 #     frontend bound to 127.0.0.1 (it proxies /api; nothing else needs the LAN)
+#   - every service restarts with Docker (comes back after a reboot)
 #   - backend and mcp also join the external `agentops_agentops` network, with
 #     the aliases `roster-backend` and `roster-mcp`, so an AgentOps tool can use
 #     url http://roster-mcp:8000/mcp
 services:
   postgres:
+    restart: unless-stopped
     ports: !override
       - "127.0.0.1:15432:5432"
 
   redis:
+    restart: unless-stopped
     ports: !override
       - "127.0.0.1:16379:6379"
 
   backend:
+    restart: unless-stopped
     ports: !override
       - "127.0.0.1:18000:8000"
     networks:
@@ -30,16 +34,21 @@ services:
         aliases: [roster-backend]
 
   frontend:
+    restart: unless-stopped
     ports: !override
       - "15173:5173"
 
   mcp:
+    restart: unless-stopped
     ports: !override
       - "127.0.0.1:18001:8000"
     networks:
       default: {}
       agentops:
         aliases: [roster-mcp]
+
+  celery_worker:
+    restart: unless-stopped
 
 networks:
   agentops:
