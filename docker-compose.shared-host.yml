@@ -7,22 +7,23 @@
 #   docker compose -f docker-compose.dev.yml -f docker-compose.shared-host.yml up -d
 #
 # What this changes:
-#   - host ports moved to 15432 / 16379 / 18000 / 18001 / 15173
+#   - host ports moved to 15432 / 16379 / 18000 / 18001 / 15173; all but the
+#     frontend bound to 127.0.0.1 (it proxies /api; nothing else needs the LAN)
 #   - backend and mcp also join the external `agentops_agentops` network, with
 #     the aliases `roster-backend` and `roster-mcp`, so an AgentOps tool can use
 #     url http://roster-mcp:8000/mcp
 services:
   postgres:
     ports: !override
-      - "15432:5432"
+      - "127.0.0.1:15432:5432"
 
   redis:
     ports: !override
-      - "16379:6379"
+      - "127.0.0.1:16379:6379"
 
   backend:
     ports: !override
-      - "18000:8000"
+      - "127.0.0.1:18000:8000"
     networks:
       default: {}
       agentops:
@@ -34,7 +35,7 @@ services:
 
   mcp:
     ports: !override
-      - "18001:8000"
+      - "127.0.0.1:18001:8000"
     networks:
       default: {}
       agentops:
