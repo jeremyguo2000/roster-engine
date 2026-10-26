@@ -1,7 +1,11 @@
-"""Chat service — runs the tool-calling loop for the in-app assistant.
+"""Chat service — answers the in-app assistant.
 
-Provider-independent: see providers.py for the Anthropic and OpenAI-compatible
-implementations, and build_provider() for how one is chosen from settings.
+The default path hands the request to the AgentOps platform (agentops.py). The
+direct providers in providers.py (Anthropic, OpenAI-compatible) run a local
+tool-calling loop here instead; they bypass the platform's guardrails, audit and
+cost tracking, so they are break-glass: `chat_provider` must name one *and*
+`chat_direct_enabled` must be true, and the backend logs a warning while one is
+active.
 """
 
 import json
@@ -101,12 +105,32 @@ documentation.\
 """
 
 
+DIRECT_PROVIDERS = ("anthropic", "openai")
+
+
 class ChatUnavailable(RuntimeError):
     """Raised when the assistant isn't configured (no API key)."""
 
 
+def direct_mode_blocked() -> str | None:
+    """Why a direct provider cannot be used right now, or None when it can.
+
+    A direct provider sends roster data straight to a model with no AgentOps
+    guardrails, audit or cost record, so it has to be switched on explicitly.
+    """
+    if settings.chat_provider in DIRECT_PROVIDERS and not settings.chat_direct_enabled:
+        return (
+            f"chat_provider is '{settings.chat_provider}', a direct (break-glass) path, "
+            "but CHAT_DIRECT_ENABLED is not true. Use scripts/chat-provider.sh, or set "
+            "CHAT_PROVIDER=agentops."
+        )
+    return None
+
+
 def is_configured() -> bool:
     """Whether the assistant can run with the current settings."""
+    if direct_mode_blocked():
+        return False
     if settings.chat_provider == "anthropic":
         return bool(settings.anthropic_api_key)
     if settings.chat_provider == "openai":
@@ -123,10 +147,38 @@ def provider_label() -> str:
     if p == "agentops":
         return "via AgentOps"
     if p == "anthropic":
-        return f"direct · {settings.chat_model or DEFAULT_ANTHROPIC_MODEL}"
+        return f"direct (break-glass) · {settings.chat_model or DEFAULT_ANTHROPIC_MODEL}"
     if p == "openai":
-        return f"direct · {settings.chat_model or 'openai-compatible'}"
+        return f"direct (break-glass) · {settings.chat_model or 'openai-compatible'}"
     return p
+
+
+def log_chat_mode() -> None:
+    """One line at startup saying which path the assistant uses. The direct paths
+    are logged at WARNING so an operator reading the log sees that requests are
+    bypassing AgentOps governance."""
+    p = settings.chat_provider
+    if p in DIRECT_PROVIDERS:
+        if settings.chat_direct_enabled:
+            logger.warning(
+                "chat assistant: DIRECT %s mode is active (break-glass). Requests bypass "
+                "AgentOps guardrails, audit and cost tracking. Set CHAT_PROVIDER=agentops "
+                "to restore the governed path.", p,
+            )
+        else:
+            logger.warning(
+                "chat assistant disabled: chat_provider='%s' is break-glass and "
+                "CHAT_DIRECT_ENABLED is not true.", p,
+            )
+    elif p == "agentops":
+        if is_configured():
+            logger.info("chat assistant: via AgentOps at %s (agent %s)",
+                        settings.agentops_base_url, settings.agentops_agent_id)
+        else:
+            logger.warning("chat assistant disabled: chat_provider='agentops' but the "
+                           "AGENTOPS_* settings are incomplete.")
+    else:
+        logger.warning("chat assistant disabled: unknown chat_provider '%s'.", p)
 
 
 def build_agentops_client() -> AgentOpsClient:
@@ -151,6 +203,12 @@ def build_agentops_client() -> AgentOpsClient:
 def build_provider() -> Provider:
     """Construct the configured provider, or explain what's missing."""
     provider = settings.chat_provider
+
+    blocked = direct_mode_blocked()
+    if blocked:
+        raise ChatUnavailable("The chat assistant is not configured: " + blocked)
+    if provider in DIRECT_PROVIDERS:
+        logger.warning("chat request served by the direct %s path (break-glass)", provider)
 
     if provider == "anthropic":
         if not settings.anthropic_api_key:
@@ -204,8 +262,8 @@ class ChatResult:
 async def answer(messages: list[dict], token: str) -> ChatResult:
     """Provider-agnostic entry point for the router.
 
-    agentops: one call to the platform; no local loop, no provider key.
-    anthropic / openai: the local tool-calling loop below, unchanged.
+    agentops (default): one call to the platform; no local loop, no provider key.
+    anthropic / openai (break-glass): the local tool-calling loop below, unchanged.
     """
     if settings.chat_provider == "agentops":
         client = build_agentops_client()

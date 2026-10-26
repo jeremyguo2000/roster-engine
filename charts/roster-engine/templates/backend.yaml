@@ -58,6 +58,30 @@ spec:
             # appEnv helper that the worker also uses.
             - name: CHAT_PROVIDER
               value: {{ .Values.chat.provider | quote }}
+            {{- if eq .Values.chat.provider "agentops" }}
+            - name: AGENTOPS_BASE_URL
+              value: {{ required "chat.agentops.baseUrl is required when chat.provider is 'agentops'" .Values.chat.agentops.baseUrl | quote }}
+            - name: AGENTOPS_AGENT_ID
+              value: {{ required "chat.agentops.agentId is required when chat.provider is 'agentops'" .Values.chat.agentops.agentId | quote }}
+            {{- with .Values.chat.agentops.model }}
+            - name: AGENTOPS_MODEL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: AGENTOPS_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: AGENTOPS_CLIENT_ID
+            - name: AGENTOPS_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: AGENTOPS_CLIENT_SECRET
+            {{- else }}
+            # Direct providers are break-glass: the backend refuses them unless this is "true".
+            - name: CHAT_DIRECT_ENABLED
+              value: {{ .Values.chat.directEnabled | quote }}
+            {{- end }}
             {{- if eq .Values.chat.provider "anthropic" }}
             - name: ANTHROPIC_API_KEY
               valueFrom:

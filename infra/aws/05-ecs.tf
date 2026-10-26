@@ -41,8 +41,11 @@ locals {
   ]
 
   # Chat assistant, backend only, and only when a key was supplied in phase 4.
+  # This is the direct (break-glass) path: there is no AgentOps on this stack,
+  # so the backend must be told explicitly to allow it.
   chat_env = var.anthropic_api_key == "" ? [] : [
     { name = "CHAT_PROVIDER", value = "anthropic" },
+    { name = "CHAT_DIRECT_ENABLED", value = "true" },
   ]
   chat_secrets = var.anthropic_api_key == "" ? [] : [
     { name = "ANTHROPIC_API_KEY", valueFrom = aws_ssm_parameter.anthropic_api_key[0].arn },

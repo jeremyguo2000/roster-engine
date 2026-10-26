@@ -141,28 +141,37 @@ scripts/aws-up.sh        # create or update the stack, create logins, load demo 
 scripts/aws-down.sh      # delete everything except ECR images; stops hourly billing
 ```
 
-## Chat assistant: direct or via AgentOps
+## Chat assistant: via AgentOps, with direct access as break-glass
 
-The in-app assistant has three interchangeable back ends, chosen by
-`CHAT_PROVIDER` in `.env`:
+The in-app assistant is served by the **AgentOps** platform. This app holds an
+Application Key and the id of its "Roster Planner" agent, nothing else: AgentOps
+picks the model, runs the roster tools through this app's MCP server, applies
+guardrails and records the run, its cost and an audit row. No model-provider key
+is needed, and a fresh stack starts and serves chat without one. The backend
+follows each run over the gateway's event stream (`GET /v1/runs/{id}/events`), so
+the answer arrives as soon as the platform has finalised it.
 
-| Value | What answers | Needs |
+| `CHAT_PROVIDER` | What answers | Needs |
 |---|---|---|
-| `anthropic` (default) | Claude, called directly from this backend, local tool loop | `ROSTER_ANTHROPIC_API_KEY` |
-| `openai` | any OpenAI-compatible endpoint (vLLM, NIM, Ollama), local tool loop | `CHAT_BASE_URL`, `CHAT_MODEL` |
-| `agentops` | the **AgentOps** platform: it picks the model, runs the roster tools through this app's MCP server, applies guardrails and records audit, trace and cost | `AGENTOPS_BASE_URL`, `AGENTOPS_CLIENT_ID`, `AGENTOPS_CLIENT_SECRET`, `AGENTOPS_AGENT_ID` |
+| `agentops` (default) | the AgentOps platform | `AGENTOPS_BASE_URL`, `AGENTOPS_CLIENT_ID`, `AGENTOPS_CLIENT_SECRET`, `AGENTOPS_AGENT_ID` |
+| `anthropic` (break-glass) | Claude, called directly from this backend, local tool loop | `CHAT_DIRECT_ENABLED=true`, `ROSTER_ANTHROPIC_API_KEY` |
+| `openai` (break-glass) | any OpenAI-compatible endpoint (vLLM, NIM, Ollama), local tool loop | `CHAT_DIRECT_ENABLED=true`, `CHAT_BASE_URL`, `CHAT_MODEL` |
 
-Switch without touching anything else (only the backend container is recreated):
+The direct providers bypass every AgentOps control, so they are **break-glass**:
+the backend refuses them unless `CHAT_DIRECT_ENABLED=true` is also set, logs a
+warning at startup and on every request while one is active, and the chat panel
+labels the path "direct (break-glass)". Use them when the platform is down, and
+switch back afterwards:
 
 ```bash
-scripts/chat-provider.sh agentops    # governed path
-scripts/chat-provider.sh anthropic   # direct path
+scripts/chat-provider.sh anthropic   # break-glass: sets CHAT_PROVIDER and CHAT_DIRECT_ENABLED=true
+scripts/chat-provider.sh agentops    # back to the governed path; clears the flag
 ```
 
-The chat panel shows which path is active ("via AgentOps" or "direct · <model>"),
-and in AgentOps mode each reply carries the platform `run_id` so it can be found in
-Runs & Traces. A request blocked by an AgentOps guardrail is shown to the user as
-"blocked by policy" rather than as an error.
+Only the backend container is recreated. In AgentOps mode each reply carries the
+platform `run_id` so it can be found in Runs & Traces, and a request blocked by an
+AgentOps guardrail is shown to the user as "blocked by policy" rather than as an
+error.
 
 ## Authentication
  

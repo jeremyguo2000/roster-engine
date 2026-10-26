@@ -73,16 +73,35 @@ mcp:
 chat:
   enabled: false
 
-  # "anthropic" — the Claude API. Best answer quality, but the backend pod needs
-  #   egress to https://api.anthropic.com, and roster contents (including staff
-  #   names) leave the cluster.
-  # "openai"    — any endpoint speaking OpenAI's /v1/chat/completions with tool
-  #   calling. This is the on-prem option: nothing leaves the cluster. HPE PCAI
-  #   serves models this way (vllm/vllm-openai with --enable-auto-tool-choice), as
-  #   do NVIDIA NIM and Ollama. Despite the name, no request goes to OpenAI.
-  provider: anthropic
+  # "agentops"  — the default. The assistant is served by the AgentOps platform:
+  #   this app holds an Application Key, and the platform picks the model, runs
+  #   the roster tools through this app's MCP server, applies guardrails and
+  #   records run, cost and audit. No model-provider key is held here.
+  # "anthropic" — BREAK-GLASS. The Claude API, called directly: the backend pod
+  #   needs egress to https://api.anthropic.com, roster contents (including staff
+  #   names) leave the cluster, and nothing is guardrailed or audited.
+  # "openai"    — BREAK-GLASS. Any endpoint speaking OpenAI's /v1/chat/completions
+  #   with tool calling (vllm/vllm-openai, NVIDIA NIM, Ollama). Nothing leaves the
+  #   cluster, but nothing is guardrailed or audited either.
+  provider: agentops
 
-  # provider: anthropic
+  # provider: agentops
+  agentops:
+    # The AgentOps BFF, reachable from the backend pod.
+    baseUrl: "http://agentops-bff.agentops.svc.cluster.local:8080"
+    # Application Key issued on the AgentOps Applications page.
+    clientId: ""
+    clientSecret: ""
+    # The "Roster Planner" agent on the platform.
+    agentId: ""
+    # Optional model override; the agent's configured default otherwise.
+    model: ""
+
+  # The direct providers are refused unless this is true. The backend logs a
+  # warning while it is on; switch back to agentops when the platform is back.
+  directEnabled: false
+
+  # provider: anthropic (break-glass)
   anthropicApiKey: ""  # from https://console.anthropic.com/settings/keys
 
   # provider: openai — baseUrl and model are both required.

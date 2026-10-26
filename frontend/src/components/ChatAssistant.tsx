@@ -80,8 +80,9 @@ export default function ChatAssistant() {
     inputRef.current?.focus();
   }
 
-  // Hidden when logged out, and when the server has no API key — better than
-  // offering a widget that fails on first use.
+  // Hidden when logged out, and when the server reports the assistant is not
+  // configured (no AgentOps key, or a direct provider selected without the
+  // break-glass flag) — better than offering a widget that fails on first use.
   if (!user || statusQ.data?.enabled !== true) return null;
 
   if (!open) {
