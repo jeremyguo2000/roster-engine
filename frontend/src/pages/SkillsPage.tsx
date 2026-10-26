@@ -12,6 +12,7 @@ import {
 import { errorMessage } from "../api/client";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 
 export default function SkillsPage() {
   const [addOpen, setAddOpen] = useState(false);
@@ -65,6 +66,7 @@ function SkillTypeRow({
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const askConfirm = useConfirm();
   const [newVal, setNewVal] = useState("");
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(name);
@@ -155,7 +157,15 @@ function SkillTypeRow({
               <button className="btn btn-sm" onClick={() => setEditing(true)}>Edit</button>
               <button
                 className="btn btn-sm btn-danger"
-                onClick={() => confirm(`Delete type "${name}" and its values?`) && delType.mutate()}
+                onClick={async () => {
+                  const ok = await askConfirm({
+                    title: `Delete type "${name}"?`,
+                    body: "Its values will be deleted too.",
+                    confirmLabel: "Delete",
+                    danger: true,
+                  });
+                  if (ok) delType.mutate();
+                }}
               >
                 Delete
               </button>

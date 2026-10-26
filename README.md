@@ -14,6 +14,7 @@ for end-user instructions.
 cp .env.example .env
 # Edit .env — set a strong POSTGRES_PASSWORD
 # Also set SECRET_KEY (generate with: openssl rand -hex 32)
+# And MCP_ACCESS_TOKEN (same command) — what MCP clients send as a bearer header
 ```
 
 ### 2. Build the images with your user IDs
@@ -123,6 +124,21 @@ docker compose -f docker-compose.dev.yml down
 
 # Stop and wipe the database volume (destructive — all data lost)
 docker compose -f docker-compose.dev.yml down -v
+```
+
+## Deployment
+
+Two targets, each with its own guide:
+
+- **Kubernetes / HPE PCAI** via the Helm chart in `charts/roster-engine` — see [DEPLOY.md](DEPLOY.md).
+- **AWS (ECS Fargate)** via Terraform in `infra/aws` — see [DEPLOY-AWS.md](DEPLOY-AWS.md).
+
+For AWS, day to day:
+
+```bash
+scripts/aws-deploy.sh    # build both images, tag with git SHA, push to ECR
+scripts/aws-up.sh        # create or update the stack, create logins, load demo data
+scripts/aws-down.sh      # delete everything except ECR images; stops hourly billing
 ```
 
 ## Chat assistant: direct or via AgentOps

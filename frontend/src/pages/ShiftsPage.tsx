@@ -18,6 +18,7 @@ import {
 import { errorMessage } from "../api/client";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import { CURATED_COLOURS } from "../lib/colours";
 import { hhmmToMin, minToHHMM, durationMin } from "../lib/time";
 import { useCollapsed } from "../lib/useCollapsed";
@@ -108,6 +109,7 @@ function GroupCard({
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const askConfirm = useConfirm();
   const [collapsed, setCollapsed] = useCollapsed(`roster-engine.collapsed.shift-group.${group.id}`);
   const bodyId = `shift-group-body-${group.id}`;
   const del = useMutation({
@@ -165,8 +167,13 @@ function GroupCard({
           {group.code !== "Leaves" && (
             <button
               className="btn btn-sm btn-danger"
-              onClick={() => {
-                if (confirm(`Delete group ${group.code}?`)) del.mutate();
+              onClick={async () => {
+                const ok = await askConfirm({
+                  title: `Delete group ${group.code}?`,
+                  confirmLabel: "Delete",
+                  danger: true,
+                });
+                if (ok) del.mutate();
               }}
               disabled={del.isPending}
             >
@@ -219,8 +226,14 @@ function GroupCard({
                         </button>
                         <button
                           className="btn btn-sm btn-danger"
-                          onClick={() => {
-                            if (confirm(`Delete shift ${s.code}?`)) delShift.mutate(s.id);
+                          onClick={async () => {
+                            const ok = await askConfirm({
+                              title: `Delete shift ${s.code}?`,
+                              body: s.name,
+                              confirmLabel: "Delete",
+                              danger: true,
+                            });
+                            if (ok) delShift.mutate(s.id);
                           }}
                         >
                           ✕

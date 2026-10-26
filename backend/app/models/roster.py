@@ -1,7 +1,7 @@
 import enum
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Integer, String, Date, ForeignKey, Enum, UniqueConstraint
+from sqlalchemy import Integer, String, Date, DateTime, ForeignKey, Enum, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,6 +31,10 @@ class Roster(Base):
     target_work_min: Mapped[int] = mapped_column(Integer, nullable=False)
     result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     celery_task_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     profile: Mapped["Profile"] = relationship("Profile", back_populates="rosters")  # noqa: F821
     roster_demands: Mapped[list["RosterDemand"]] = relationship(

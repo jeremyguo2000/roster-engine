@@ -13,6 +13,7 @@ import { Shift, listShifts } from "../api/shifts";
 import { errorMessage } from "../api/client";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import { dateRange } from "../lib/calendar";
 
 export default function LeavesPage() {
@@ -137,6 +138,7 @@ export default function LeavesPage() {
 function LeaveRow({ leave, staffName }: { leave: Leave; staffName: string }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const askConfirm = useConfirm();
   const del = useMutation({
     mutationFn: () => deleteLeave(leave.id),
     onSuccess: () => {
@@ -154,7 +156,15 @@ function LeaveRow({ leave, staffName }: { leave: Leave; staffName: string }) {
       <td className="row-end">
         <button
           className="btn btn-sm btn-danger"
-          onClick={() => confirm("Remove this leave?") && del.mutate()}
+          onClick={async () => {
+            const ok = await askConfirm({
+              title: "Remove this leave?",
+              body: `${staffName} · ${leave.date} · ${leave.shift_code}`,
+              confirmLabel: "Remove",
+              danger: true,
+            });
+            if (ok) del.mutate();
+          }}
         >
           ✕
         </button>

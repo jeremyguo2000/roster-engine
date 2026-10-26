@@ -14,10 +14,12 @@ import { Staff, StaffGroup, listStaff, listStaffGroups } from "../../api/staff";
 import { errorMessage } from "../../api/client";
 import { useCollapsed } from "../../lib/useCollapsed";
 import { useToast } from "../Toast";
+import { useConfirm } from "../Confirm";
 
 export default function ProfileStaffTab({ profile }: { profile: Profile }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const askConfirm = useConfirm();
 
   const selectedQ = useQuery({
     queryKey: ["profile", profile.id, "staff"],
@@ -84,10 +86,14 @@ export default function ProfileStaffTab({ profile }: { profile: Profile }) {
             selectedMap={selectedMap}
             allIn={allIn}
             onAddGroup={() => addGroup.mutate(g.id)}
-            onRemoveGroup={() => {
-              if (confirm(`Remove all staff in ${g.name} from this profile?`)) {
-                removeGroup.mutate(g.id);
-              }
+            onRemoveGroup={async () => {
+              const ok = await askConfirm({
+                title: `Remove all staff in ${g.name}?`,
+                body: "They stay on the roster system — this only removes them from this profile.",
+                confirmLabel: "Remove",
+                danger: true,
+              });
+              if (ok) removeGroup.mutate(g.id);
             }}
             onAdd={(id) => add.mutate(id)}
             onRemove={(id) => remove.mutate(id)}

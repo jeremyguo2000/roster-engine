@@ -19,26 +19,40 @@ wrapper over the backend API. It runs as its own container on **host port 8001**
 | `create_roster` | `POST /api/demands` (×N) then `POST /api/rosters` | Dispatch a roster to the solver |
 | `get_roster_status` | `GET /api/rosters/{id}` | Poll until the solver finishes |
 
-> Note: a bare `GET http://localhost:8001/mcp` returns `307 Temporary Redirect` to `/mcp/`. That is expected —
-> MCP clients follow it automatically.
+> Note: a bare `GET http://localhost:8001/mcp` returns `401` without the access token (next section), and
+> `307 Temporary Redirect` to `/mcp/` with it. Both are expected — MCP clients send the header and follow the
+> redirect automatically.
 
 ## Authentication model (read this first)
 
-The MCP server **holds its own credentials and logs itself in** — it does not use the caller's identity at all.
-On first tool call it authenticates to the backend as a fixed **service account** (`ROSTER_SERVICE_USERNAME` /
-`ROSTER_SERVICE_PASSWORD`, set in the `mcp` container's environment — `mcp_service` in this repo's `.env`),
-caches the resulting JWT, and re-logs-in automatically before it expires or after a `401`
-(`backend/app/mcp_server/token_manager.py`).
+There are two layers, and they are independent.
+
+**Inbound — the client proves it may call the server.** Every request must carry the deployment's shared
+access token:
+
+```
+Authorization: Bearer <MCP_ACCESS_TOKEN>
+```
+
+`MCP_ACCESS_TOKEN` is set in the `mcp` container's environment (`.env` locally; the chart's `mcp.accessToken`;
+SSM `/roster/MCP_ACCESS_TOKEN` on AWS). A request without it, or with the wrong value, gets `401` before it
+reaches the MCP transport (`backend/app/mcp_server/auth.py`). It is one static token per deployment, shared by
+every client that connects — it says "this client is allowed in", not who the human is.
+
+**Outbound — the server logs itself in to the backend.** The MCP server holds its own credentials: on first
+tool call it authenticates to the backend as a fixed **service account** (`ROSTER_SERVICE_USERNAME` /
+`ROSTER_SERVICE_PASSWORD`, `svc-mcp` in this repo's `.env`), caches the resulting JWT, and re-logs-in
+automatically before it expires or after a `401` (`backend/app/mcp_server/token_manager.py`). The access token
+the client sent is **not** forwarded — `backend/app/tooling/client.py` always attaches the service account's
+own token.
 
 Practically, this means:
 
-- **You don't obtain or configure a token.** Any `Authorization` header an MCP client sends is ignored —
-  `backend/app/mcp_server/client.py` always attaches the service account's own token.
-- **Every connected client shares one identity.** The backend has no way to distinguish which human is behind
-  a given tool call — whoever can reach the server's URL gets the full privileges of `mcp_service`. Treat
-  network reachability (Step 3 below) as the real access control for now.
-- The service account (`mcp_service` / `svc-mcp`, depending on environment — see `CLAUDE.md` and `DEPLOY.md`)
-  must already exist in the backend; it's created once during setup, not per chatbot user.
+- **You configure one header on the client and nothing else.** No backend login, no per-user JWT.
+- **Every connected client shares one identity.** The backend cannot distinguish which human is behind a given
+  tool call — everyone holding the access token acts as `svc-mcp`. Treat the token accordingly: it is a
+  credential for the whole roster, not a login for a person.
+- The service account must already exist in the backend; it's created once during setup, not per chatbot user.
 
 `backend/app/mcp_server/identity.py` documents a "multi-user seam" for a future per-caller identity model, but
 that isn't implemented yet — today it's always the one shared account.
@@ -58,7 +72,8 @@ that isn't implemented yet — today it's always the one shared account.
 ## Step 1 — Register the server with your MCP client
 
 The connection facts are the same for both clients — URL `http://localhost:8001/mcp`, Streamable HTTP
-transport, no credentials needed on the client side. Only the registration syntax differs.
+transport, and the header `Authorization: Bearer <MCP_ACCESS_TOKEN>` with the value from `.env`. Only the
+registration syntax differs.
 
 ### 1A — OpenClaw
 
@@ -69,14 +84,16 @@ openclaw mcp add roster-engine \
   --transport streamable-http
 ```
 
-**Or edit the config file** `~/.openclaw/openclaw.json`:
+then add the `Authorization` header (`openclaw mcp add --help` shows the flag for your version), **or edit the
+config file** `~/.openclaw/openclaw.json`:
 ```json
 {
   "mcp": {
     "servers": {
       "roster-engine": {
         "url": "http://localhost:8001/mcp",
-        "transport": "streamable-http"
+        "transport": "streamable-http",
+        "headers": { "Authorization": "Bearer <MCP_ACCESS_TOKEN>" }
       }
     }
   }
@@ -89,7 +106,8 @@ Run `openclaw mcp --help` to see the exact status/list/remove subcommands for yo
 
 **CLI:**
 ```bash
-claude mcp add --transport http roster-engine http://localhost:8001/mcp
+claude mcp add --transport http roster-engine http://localhost:8001/mcp \
+  --header "Authorization: Bearer $MCP_ACCESS_TOKEN"
 ```
 
 - The transport flag is **`http`** for Claude Code (vs `streamable-http` for OpenClaw) — it's the same
@@ -97,8 +115,9 @@ claude mcp add --transport http roster-engine http://localhost:8001/mcp
 - **Scope** with `-s`:
   - `local` (default) — this project only, written to `~/.claude.json`.
   - `user` — available across all your projects.
-  - `project` — shared with the team via a checked-in `.mcp.json`. Since no per-user secret is involved anymore,
-    `project` scope is safe to use here if you want the team to share the registration.
+  - `project` — shared with the team via a checked-in `.mcp.json`. Don't paste the token into that file:
+    Claude Code expands `${MCP_ACCESS_TOKEN}` inside header values from the environment, so commit the
+    reference and keep the value in each developer's shell.
 - Undo with `claude mcp remove roster-engine`.
 
 > **Startup caveat:** Claude Code loads MCP servers at session start. Adding the server mid-session registers it
@@ -116,7 +135,9 @@ claude mcp add --transport http roster-engine http://localhost:8001/mcp
   ```bash
   curl -i http://<host-ip>:8001/mcp
   ```
-  A `307` (or `405`) proves the port is published. `Connection refused` means a port-mapping or firewall issue.
+  A `401` proves the port is published (the access-token check answers before anything else). Add
+  `-H "Authorization: Bearer $MCP_ACCESS_TOKEN"` and the transport answers `307` (or `405`) instead.
+  `Connection refused` means a port-mapping or firewall issue.
 
 ## Step 3 — Reload & verify the connection
 
@@ -171,6 +192,7 @@ When `status` is `draft`, the solved roster also shows up in the web UI under **
 
 | Symptom | Cause / fix |
 |---|---|
+| Client cannot connect; `curl` of the MCP URL returns `401` | The client isn't sending `Authorization: Bearer <MCP_ACCESS_TOKEN>`, or its value differs from the `mcp` container's `MCP_ACCESS_TOKEN`. This is the server's own check, before any backend call. |
 | Tool error `MCP service account login failed (…)` | `ROSTER_SERVICE_USERNAME`/`ROSTER_SERVICE_PASSWORD` on the `mcp` container don't match a real backend user — check `.env` and that the account exists. |
 | Tool error `Backend returned 401` | The service account's cached token was rejected; the client retries once with a fresh login automatically — a persistent 401 means the account's password changed or was deleted. |
 | `Connection refused` | Wrong host or port not published — see Step 2. |
@@ -180,6 +202,6 @@ Known limitations (see `TESTPLAN.md` §7 for detail):
 
 - **No transactional rollback** on `create_roster`: if one demand in the batch fails after earlier ones were
   created, the earlier demand rows remain in the database.
-- **Single shared identity:** every connected client acts as the same `mcp_service` account (see "Authentication
-  model" above) — there's no per-caller audit trail today, so treat network reachability as the access control.
+- **Single shared identity:** every connected client acts as the same `svc-mcp` account (see "Authentication
+  model" above) — the access token decides who may call at all, but there's no per-caller audit trail.
 - The MCP server is a single uvicorn process — treat it as single-user for now.

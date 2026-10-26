@@ -12,10 +12,12 @@ import { Shift, ShiftGroup, listShiftGroups, listShifts } from "../../api/shifts
 import { errorMessage } from "../../api/client";
 import { useCollapsed } from "../../lib/useCollapsed";
 import { useToast } from "../Toast";
+import { useConfirm } from "../Confirm";
 
 export default function ProfileShiftsTab({ profile }: { profile: Profile }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const askConfirm = useConfirm();
 
   const selectedQ = useQuery({
     queryKey: ["profile", profile.id, "shifts"],
@@ -71,10 +73,14 @@ export default function ProfileShiftsTab({ profile }: { profile: Profile }) {
             selected={selected}
             groupAllIn={groupAllIn}
             onAddGroup={() => addGroup.mutate(g.id)}
-            onRemoveGroup={() => {
-              if (confirm(`Remove all shifts in ${g.code} from this profile?`)) {
-                removeGroup.mutate(g.id);
-              }
+            onRemoveGroup={async () => {
+              const ok = await askConfirm({
+                title: `Remove all shifts in ${g.code}?`,
+                body: "They stay defined — this only removes them from this profile.",
+                confirmLabel: "Remove",
+                danger: true,
+              });
+              if (ok) removeGroup.mutate(g.id);
             }}
             onAddOne={(id) => addOne.mutate(id)}
             onRemoveOne={(id) => removeOne.mutate(id)}

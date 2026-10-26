@@ -60,6 +60,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "roster-engine.fullname" . }}
                   key: ROSTER_SERVICE_PASSWORD
+            - name: MCP_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "roster-engine.fullname" . }}
+                  key: MCP_ACCESS_TOKEN
           readinessProbe:
             tcpSocket:
               port: 8000

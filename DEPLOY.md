@@ -68,6 +68,7 @@ postgres:
 
 mcp:
   servicePassword: "<pick a password for the MCP service account>"
+  accessToken: "<openssl rand -hex 32>"   # what MCP clients send as `Authorization: Bearer ...`
 ```
 
 **Optional — the in-app chat assistant.** Off by default, and it runs against
@@ -169,7 +170,9 @@ ingress:
 
 **HPE PCAI:** see next section.
 
-MCP clients connect to `<same base url>/mcp` (Streamable HTTP).
+MCP clients connect to `<same base url>/mcp` (Streamable HTTP) and must send
+the header `Authorization: Bearer <mcp.accessToken>`; see MCP-guide.md for the
+per-client registration syntax.
 
 ## 7. HPE PCAI import
 
@@ -221,7 +224,8 @@ kind load docker-image roster-backend:0.2.0 roster-frontend:0.2.0 --name roster
 helm install roster charts/roster-engine -n roster --create-namespace \
   --set auth.secretKey=$(openssl rand -hex 32) \
   --set postgres.password=localtest \
-  --set mcp.servicePassword=mcptest
+  --set mcp.servicePassword=mcptest \
+  --set mcp.accessToken=mcptest-token
 kubectl -n roster get pods -w        # wait for 6/6 Running & Ready (backend restarts a few times — normal)
 
 kubectl -n roster exec deploy/roster-roster-engine-backend -- python -m app.scripts.create_user admin admin123
@@ -255,6 +259,7 @@ create a roster in the UI. Two things to know when test-driving a solve:
 | `postgres` pod `Pending` forever | No default StorageClass — set `postgres.persistence.storageClassName` |
 | Backend restarts a few times then settles | Normal: waiting for Postgres on first boot |
 | Backend `CrashLoopBackOff` persistently | `kubectl logs` it — usually a bad `DATABASE_URL`/password |
+| MCP client gets 401 from `/mcp` itself | Client isn't sending `Authorization: Bearer <mcp.accessToken>` |
 | Login fails with 401 for MCP tools | `svc-mcp` user not created, or password ≠ `mcp.servicePassword` |
 | Solves stuck in `running` | Worker pod down or can't reach Redis — check `kubectl logs deploy/...-worker` |
 | UI loads but API calls fail | Backend not Ready — check `/api/health` via `kubectl port-forward svc/...-backend 8000:8000` |

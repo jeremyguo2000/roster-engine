@@ -15,6 +15,9 @@ roster-engine {{ .Chart.Version }} installed as release "{{ .Release.Name }}".
    # service account for the MCP server (MUST match mcp.serviceUsername/servicePassword)
    kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "roster-engine.backendHost" . }} -- \
      python -m app.scripts.create_user {{ .Values.mcp.serviceUsername }} <mcp-service-password>
+
+   MCP clients connect to <app url>/mcp and must send the header
+   "Authorization: Bearer <mcp.accessToken>" (see MCP-guide.md).
 {{- end }}
 
 3. Open the app:

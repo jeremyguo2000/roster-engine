@@ -12,6 +12,7 @@ import Nav from "./components/Nav";
 import { AuthProvider } from "./auth/AuthContext";
 import RequireAuth from "./auth/RequireAuth";
 import { ToastProvider } from "./components/Toast";
+import { ConfirmProvider } from "./components/Confirm";
 import RosterJobWatcher from "./components/RosterJobWatcher";
 import WorkflowGuide from "./components/WorkflowGuide";
 import ChatAssistant from "./components/ChatAssistant";
@@ -20,26 +21,28 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <RosterJobWatcher />
-        <WorkflowGuide />
-        <ChatAssistant />
-        <div className="app-shell">
-          <Nav />
-          <main className="main">
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/" element={<Navigate to="/rosters" replace />} />
-              <Route path="/rosters" element={<RequireAuth><RostersPage /></RequireAuth>} />
-              <Route path="/shifts" element={<RequireAuth><ShiftsPage /></RequireAuth>} />
-              <Route path="/staff" element={<RequireAuth><StaffPage /></RequireAuth>} />
-              <Route path="/skills" element={<RequireAuth><SkillsPage /></RequireAuth>} />
-              <Route path="/leaves" element={<RequireAuth><LeavesPage /></RequireAuth>} />
-              <Route path="/profiles" element={<RequireAuth><ProfilesPage /></RequireAuth>} />
-              <Route path="/generate" element={<RequireAuth><GeneratePage /></RequireAuth>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-        </div>
+        <ConfirmProvider>
+          <RosterJobWatcher />
+          <WorkflowGuide />
+          <ChatAssistant />
+          <div className="app-shell">
+            <Nav />
+            <main className="main">
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/" element={<Navigate to="/rosters" replace />} />
+                <Route path="/rosters" element={<RequireAuth><RostersPage /></RequireAuth>} />
+                <Route path="/shifts" element={<RequireAuth><ShiftsPage /></RequireAuth>} />
+                <Route path="/staff" element={<RequireAuth><StaffPage /></RequireAuth>} />
+                <Route path="/skills" element={<RequireAuth><SkillsPage /></RequireAuth>} />
+                <Route path="/leaves" element={<RequireAuth><LeavesPage /></RequireAuth>} />
+                <Route path="/profiles" element={<RequireAuth><ProfilesPage /></RequireAuth>} />
+                <Route path="/generate" element={<RequireAuth><GeneratePage /></RequireAuth>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </main>
+          </div>
+        </ConfirmProvider>
       </ToastProvider>
     </AuthProvider>
   );

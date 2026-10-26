@@ -18,6 +18,7 @@ import {
 import { errorMessage } from "../api/client";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import StaffSkillsModal from "../components/staff/StaffSkillsModal";
 import PermittedShiftsModal from "../components/staff/PermittedShiftsModal";
 import { useCollapsed } from "../lib/useCollapsed";
@@ -128,6 +129,7 @@ function StaffGroupCard({
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const askConfirm = useConfirm();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(group.name);
   const [collapsed, setCollapsed] = useCollapsed(`roster-engine.collapsed.staff-group.${group.id}`);
@@ -217,8 +219,13 @@ function StaffGroupCard({
               <button className="btn btn-sm btn-primary" onClick={onAddStaff}>+ Staff</button>
               <button
                 className="btn btn-sm btn-danger"
-                onClick={() => {
-                  if (confirm(`Delete group ${group.name}?`)) del.mutate();
+                onClick={async () => {
+                  const ok = await askConfirm({
+                    title: `Delete group ${group.name}?`,
+                    confirmLabel: "Delete",
+                    danger: true,
+                  });
+                  if (ok) del.mutate();
                 }}
                 disabled={del.isPending}
               >
@@ -281,6 +288,7 @@ function StaffRow({
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const askConfirm = useConfirm();
   const del = useMutation({
     mutationFn: () => softDeleteStaff(staff.id),
     onSuccess: () => {
@@ -348,7 +356,15 @@ function StaffRow({
             className="btn btn-sm btn-danger"
             aria-label="Archive"
             title="Archive"
-            onClick={() => confirm(`Archive ${staff.full_name}?`) && del.mutate()}
+            onClick={async () => {
+              const ok = await askConfirm({
+                title: `Archive ${staff.full_name}?`,
+                body: "They can be restored later.",
+                confirmLabel: "Archive",
+                danger: true,
+              });
+              if (ok) del.mutate();
+            }}
             disabled={del.isPending}
           >
             ✕
