@@ -182,7 +182,9 @@ async def test_guardrail_block_becomes_the_reply_not_an_error():
 
 
 @pytest.mark.parametrize("status,needle", [
-    (403, "not entitled"), (402, "budget"), (429, "Rate limit"), (500, "HTTP 500"),
+    # 403 passes the platform's own message through: it may mean "not entitled"
+    # or "application is suspended", and only AgentOps knows which.
+    (403, "refused this application: boom"), (402, "budget"), (429, "Rate limit"), (500, "HTTP 500"),
 ])
 async def test_other_invoke_errors_raise(status, needle):
     handler, _ = _platform([], invoke_status=status, invoke_body={"message": "boom"})
