@@ -117,7 +117,7 @@ class AgentOpsClient:
             logger.info("agentops guardrail blocked a chat request: %s", reason)
             return f"That request was blocked by policy: {reason}", None
         if r.status_code == 403:
-            raise AgentOpsError("This application is not entitled to the scheduling agent.")
+            raise AgentOpsError(f"AgentOps refused this application: {_detail(r)}")
         if r.status_code == 402:
             raise AgentOpsError("The application's AgentOps budget is exhausted.")
         if r.status_code == 429:
