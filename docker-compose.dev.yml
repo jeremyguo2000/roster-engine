@@ -41,14 +41,18 @@ services:
       - CELERY_RESULT_BACKEND=db+postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - SECRET_KEY=${SECRET_KEY}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      # Which path serves the chat assistant. agentops (default) needs only the
+      # Application Key below. anthropic | openai are direct, ungoverned paths —
+      # break-glass only: they are refused unless CHAT_DIRECT_ENABLED=true as
+      # well. scripts/chat-provider.sh sets both; only the backend is recreated.
+      - CHAT_PROVIDER=${CHAT_PROVIDER:-agentops}
+      - CHAT_DIRECT_ENABLED=${CHAT_DIRECT_ENABLED:-false}
+      # Break-glass settings (unused on the agentops path; the app starts without them).
       # Read from ROSTER_ANTHROPIC_API_KEY, not ANTHROPIC_API_KEY: Compose resolves
       # ${VAR} from the shell before .env, so a developer machine that exports
       # ANTHROPIC_API_KEY for other tooling would silently shadow this file. The
       # namespaced name can't collide; the container still sees ANTHROPIC_API_KEY.
-      - ANTHROPIC_API_KEY=${ROSTER_ANTHROPIC_API_KEY}
-      # Which path serves the chat assistant: anthropic | openai | agentops.
-      # Toggle with scripts/chat-provider.sh; only the backend is recreated.
-      - CHAT_PROVIDER=${CHAT_PROVIDER:-anthropic}
+      - ANTHROPIC_API_KEY=${ROSTER_ANTHROPIC_API_KEY:-}
       - CHAT_MODEL=${CHAT_MODEL:-}
       - CHAT_BASE_URL=${CHAT_BASE_URL:-}
       - CHAT_API_KEY=${CHAT_API_KEY:-}

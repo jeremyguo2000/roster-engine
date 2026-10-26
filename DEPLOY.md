@@ -71,12 +71,34 @@ mcp:
   accessToken: "<openssl rand -hex 32>"   # what MCP clients send as `Authorization: Bearer ...`
 ```
 
-**Optional — the in-app chat assistant.** Off by default, and it runs against
-either of two model providers. Left disabled, `/api/chat` returns 503 and the web
-UI hides the widget; nothing else is affected and the app needs no outbound
-internet access at all.
+**Optional — the in-app chat assistant.** Off by default. Left disabled,
+`/api/chat` returns 503 and the web UI hides the widget; nothing else is affected
+and the app needs no outbound internet access at all.
 
-**Option A — on-prem model (no data leaves the cluster).** Point it at any
+**Default — via AgentOps (governed).** The assistant is served by the AgentOps
+platform: the backend holds only an Application Key and the id of the "Roster
+Planner" agent. AgentOps picks the model, runs the roster tools through this
+app's MCP server, applies guardrails and records every run with its cost and an
+audit row. Issue the key on the AgentOps Applications page and entitle it to the
+agent.
+
+```yaml
+chat:
+  enabled: true
+  provider: agentops
+  agentops:
+    baseUrl: "http://agentops-bff.agentops.svc.cluster.local:8080"
+    clientId: "ak_..."
+    clientSecret: "as_..."
+    agentId: "<Roster Planner agent id>"
+```
+
+The two options below talk to a model **directly**, with no guardrails, audit or
+cost tracking. They are **break-glass** for when the platform is unavailable: the
+chart refuses them unless `chat.directEnabled: true` is set as well, and the
+backend logs a warning while one is active. Switch back to `agentops` afterwards.
+
+**Break-glass A — on-prem model (no data leaves the cluster).** Point it at any
 endpoint serving OpenAI's `/v1/chat/completions` with tool calling. On PCAI that's
 a model deployed through MLIS/NIM or `vllm/vllm-openai`; the endpoint URL is the
 one under *GenAI → Model Endpoints* with `/v1` appended.
@@ -85,6 +107,7 @@ one under *GenAI → Model Endpoints* with `/v1` appended.
 chat:
   enabled: true
   provider: openai
+  directEnabled: true
   baseUrl: "http://<model-endpoint>.<namespace>.svc.cluster.local:8080/v1"
   model: "llama-3.3-70b-instruct"   # must be one validated for tool calling
   apiKey: ""                         # only if the endpoint requires a token
@@ -100,12 +123,13 @@ is a wire format that most self-hosted servers implement. Requests go only to
 > `create_roster`, which takes a nested array of demand rows; a 70B-class instruct
 > model is a sensible floor. Read-only questions are far less demanding.
 
-**Option B — Claude API (best quality, needs egress).**
+**Break-glass B — Claude API (best quality, needs egress).**
 
 ```yaml
 chat:
   enabled: true
   provider: anthropic
+  directEnabled: true
   anthropicApiKey: "<key from console.anthropic.com/settings/keys>"
 ```
 
@@ -115,7 +139,8 @@ chat:
 > ⚠️ **Data leaves the cluster.** Answering questions about a solved roster sends
 > that roster's contents — including staff names — to the Anthropic API. Confirm
 > that's acceptable under the deployment's data-governance rules before enabling
-> it anywhere holding real staff data. If it isn't, use Option A.
+> it anywhere holding real staff data. If it isn't, use break-glass A — or better,
+> the AgentOps path, where the PII guardrail redacts before anything is stored.
 
 ```bash
 helm install roster charts/roster-engine-0.2.0.tgz -n roster --create-namespace -f my-values.yaml
@@ -263,7 +288,7 @@ create a roster in the UI. Two things to know when test-driving a solve:
 | Login fails with 401 for MCP tools | `svc-mcp` user not created, or password ≠ `mcp.servicePassword` |
 | Solves stuck in `running` | Worker pod down or can't reach Redis — check `kubectl logs deploy/...-worker` |
 | UI loads but API calls fail | Backend not Ready — check `/api/health` via `kubectl port-forward svc/...-backend 8000:8000` |
-| Chat widget never appears | `chat.enabled` is false, or no key — the UI hides it when `GET /api/chat/status` reports `enabled: false` |
+| Chat widget never appears | `chat.enabled` is false, the AgentOps key settings are incomplete, or a direct provider is selected without `chat.directEnabled` — the UI hides it when `GET /api/chat/status` reports `enabled: false`; the backend log says which |
 | Chat replies "assistant failed to respond" | `kubectl logs deploy/...-backend` shows the cause. `provider: anthropic` — blocked egress to `api.anthropic.com`, or a bad key. `provider: openai` — wrong `baseUrl`, or the endpoint returned non-200 (the log quotes its body) |
 | Chat answers but never uses live data | The model isn't emitting tool calls. Check the endpoint runs with tool calling enabled (`--enable-auto-tool-choice` + a matching `--tool-call-parser` on vLLM) and that the model supports it |
 | Which provider is live? | `GET /api/chat/status` returns `{"enabled": ..., "provider": ...}` |

@@ -1,13 +1,26 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.chat.service import log_chat_mode
 from app.routers import skills, shifts, staff, profiles, rosters, demands, auth, chat
- 
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Say which path the assistant uses — the direct (break-glass) paths log a
+    # warning so nobody runs ungoverned by accident.
+    log_chat_mode()
+    yield
+
+
 app = FastAPI(
     title="Roster Engine API",
     version="1.0.0",
     description="Generic roster scheduling engine backed by CP-SAT solver.",
+    lifespan=lifespan,
 )
  
 app.add_middleware(
